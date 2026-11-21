@@ -43,34 +43,13 @@
         <div id="bracket-root"></div>
       </main>
 
-      <section class="demo-editor" aria-label="試合スケジュール編集・チーム検索">
-        <h2>選択中の試合のコート・開始時間を変更 / チーム検索</h2>
-        <div class="demo-editor-row">
-          <span id="selected-match-label" class="demo-editor-target">対象: 決勝 (m7)</span>
-          <label class="demo-control">
-            <span>コート</span>
-            <input id="venue-input" type="text" list="venue-presets" value="センターコート" placeholder="例: 第3コート" />
-            <datalist id="venue-presets">
-              <option value="第1コート"></option>
-              <option value="第2コート"></option>
-              <option value="第3コート"></option>
-              <option value="センターコート"></option>
-              <option value="第1体育館 A面"></option>
-            </datalist>
-          </label>
-          <label class="demo-control">
-            <span>開始時間</span>
-            <input id="time-input" type="text" value="17:00" placeholder="例: 14:30" />
-          </label>
-          <button id="apply-schedule-btn" type="button">反映する</button>
-
-          <span class="demo-editor-divider" aria-hidden="true"></span>
-
+      <section class="demo-search" aria-label="チーム検索">
+        <div class="demo-search-row">
           <label class="demo-control">
             <span>チーム検索</span>
-            <input id="team-search-input" type="text" placeholder="例: チーム1 / 東京" />
+            <input id="team-search-input" type="text" placeholder="例: 東京 / チーム1" />
           </label>
-          <button id="team-search-btn" type="button" class="demo-btn-secondary">フォーカス</button>
+          <button id="team-search-btn" type="button">フォーカス</button>
         </div>
       </section>
 

@@ -319,10 +319,6 @@ const visibleRoundsSelect = document.getElementById(
   'visible-rounds-select',
 ) as HTMLSelectElement | null;
 const liveUpdateBtn = document.getElementById('live-update-btn') as HTMLButtonElement | null;
-const selectedMatchLabelEl = document.getElementById('selected-match-label');
-const venueInput = document.getElementById('venue-input') as HTMLInputElement | null;
-const timeInput = document.getElementById('time-input') as HTMLInputElement | null;
-const applyScheduleBtn = document.getElementById('apply-schedule-btn') as HTMLButtonElement | null;
 const teamSearchInput = document.getElementById('team-search-input') as HTMLInputElement | null;
 const teamSearchBtn = document.getElementById('team-search-btn') as HTMLButtonElement | null;
 
@@ -332,10 +328,6 @@ if (!container) {
 
 let currentData: BracketData = createInitialData();
 let liveStep = 0;
-let selectedTarget: { roundIndex: number; order: number; isBronzeMatch?: boolean } = {
-  roundIndex: currentData.rounds.length - 1,
-  order: 0,
-};
 
 const getContestantTitle = (contestantId: string | undefined): string => {
   if (!contestantId) return 'TBD';
@@ -360,31 +352,10 @@ const bracket = createBracket(currentData, container, {
     clickLogEl.textContent = `参加者選択: ${name} (${stageName} / order: ${ctx.order})`;
   },
   onMatchClick: (match, ctx) => {
+    if (!clickLogEl) return;
     const stageName = ctx.isBronzeMatch
       ? '3位決定戦'
       : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
-
-    selectedTarget = {
-      roundIndex: match.roundIndex,
-      order: match.order,
-      isBronzeMatch: ctx.isBronzeMatch,
-    };
-
-    if (selectedMatchLabelEl) {
-      selectedMatchLabelEl.textContent = `対象: ${stageName} (r${match.roundIndex}-o${match.order})`;
-    }
-    if (venueInput) {
-      venueInput.value =
-        typeof match.venue === 'string' ? match.venue : (match.venue?.name ?? '');
-    }
-    if (timeInput) {
-      timeInput.value =
-        match.startTime instanceof Date
-          ? `${String(match.startTime.getHours()).padStart(2, '0')}:${String(match.startTime.getMinutes()).padStart(2, '0')}`
-          : (match.startTime ?? '');
-    }
-
-    if (!clickLogEl) return;
     const teamA = getContestantTitle(match.sides?.[0]?.contestantId ?? match.sides?.[0]?.title);
     const teamB = getContestantTitle(match.sides?.[1]?.contestantId ?? match.sides?.[1]?.title);
     clickLogEl.textContent = `[${stageName}] ${teamA} vs ${teamB}`;
@@ -395,41 +366,11 @@ const bracket = createBracket(currentData, container, {
 sizeSelect?.addEventListener('change', () => {
   const size = Number(sizeSelect.value);
   currentData = size === 8 ? createInitialData() : createLargeSampleData(size);
-  selectedTarget = { roundIndex: currentData.rounds.length - 1, order: 0 };
   liveStep = 0;
-
-  if (selectedMatchLabelEl) {
-    selectedMatchLabelEl.textContent = `対象: 決勝 (r${selectedTarget.roundIndex}-o0)`;
-  }
 
   bracket.highlightContestantHistory(null);
   bracket.setBaseRoundIndex(0);
   bracket.replaceData(currentData);
-});
-
-// 選択中の試合のコート名・開始時間を動的に反映する
-applyScheduleBtn?.addEventListener('click', () => {
-  const nextVenue = venueInput?.value.trim() ?? '';
-  const nextTime = timeInput?.value.trim() ?? '';
-
-  if (selectedTarget.isBronzeMatch) {
-    bracket.applyMatchesUpdates([
-      {
-        isBronzeMatch: true,
-        venue: nextVenue || undefined,
-        startTime: nextTime || undefined,
-      },
-    ]);
-  } else {
-    bracket.applyMatchesUpdates([
-      {
-        roundIndex: selectedTarget.roundIndex,
-        order: selectedTarget.order,
-        venue: nextVenue || undefined,
-        startTime: nextTime || undefined,
-      },
-    ]);
-  }
 });
 
 // 参加者名部分一致で検索してフォーカス＆ハイライトする

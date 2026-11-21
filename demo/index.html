@@ -11,14 +11,14 @@
         <div>
           <h1>matchline デモ</h1>
           <p class="demo-subtitle">
-            依存ゼロ・Vanilla TypeScript製 トーナメント表描画ライブラリ（8チーム・シングルエリミネーション）
+            依存ゼロ・Vanilla TypeScript製 トーナメント表ライブラリ（チームパス強調・ラウンドナビ・複数セットスコア・LIVE・3位決定戦）
           </p>
         </div>
         <div class="demo-controls">
           <label class="demo-control">
             <span>テーマ</span>
             <select id="theme-select">
-              <option value="light">ライト（デフォルト）</option>
+              <option value="light">ライト</option>
               <option value="dark">ダーク</option>
               <option value="emerald">エメラルド</option>
             </select>
@@ -26,11 +26,26 @@
           <label class="demo-control">
             <span>接続線</span>
             <select id="connector-select">
-              <option value="orthogonal">直角（orthogonal）</option>
-              <option value="curved">曲線（curved）</option>
+              <option value="orthogonal">直角</option>
+              <option value="curved">曲線</option>
             </select>
           </label>
-          <button id="toggle-final-btn" type="button">決勝スコアを切り替え</button>
+          <label class="demo-control">
+            <span>パス強調</span>
+            <select id="highlight-trigger-select">
+              <option value="click">クリック</option>
+              <option value="hover">ホバー</option>
+            </select>
+          </label>
+          <label class="demo-control">
+            <span>表示ラウンド数</span>
+            <select id="visible-rounds-select">
+              <option value="all">すべて</option>
+              <option value="2">2ラウンド</option>
+              <option value="1">1ラウンド</option>
+            </select>
+          </label>
+          <button id="live-update-btn" type="button">決勝スコアをLIVE更新</button>
         </div>
       </header>
 
@@ -39,8 +54,8 @@
       </main>
 
       <section class="demo-log" aria-live="polite">
-        <h2>クリックイベントログ</h2>
-        <p id="click-log">試合カードをクリックすると、ここに試合情報が表示されます。</p>
+        <h2>イベントログ（チーム行をクリックすると勝ち上がりパスが強調されます）</h2>
+        <p id="click-log">試合カードまたはチーム行をクリックすると、ここに詳細が表示されます。</p>
       </section>
     </div>
 

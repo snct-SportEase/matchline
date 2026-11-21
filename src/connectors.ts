@@ -1,3 +1,4 @@
+import { getTeamKey } from './renderer';
 import type { BracketData, ConnectorType, Match } from './types';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -5,6 +6,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 interface ConnectorSpec {
   d: string;
   isWinner: boolean;
+  isHighlighted: boolean;
   fromId: string;
   toId: string;
 }
@@ -30,17 +32,22 @@ function buildPathData(
 }
 
 /**
- * 指定された試合の次ラウンド接続先マッチIDを解決する
+ * 指定された試合の次ラウンド接続先マッチを解決する
  */
-function resolveNextMatchId(
+function resolveNextMatch(
   data: BracketData,
   roundIndex: number,
   matchIndex: number,
   match: Match,
-): string | null {
-  // 明示的に nextMatchId が指定されている場合はそれを優先する（変則トーナメントやBYE対応）
+): Match | null {
   if (match.nextMatchId) {
-    return match.nextMatchId;
+    for (const round of data.rounds) {
+      const found = round.matches.find((m) => m.id === match.nextMatchId);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
   }
 
   const nextRound = data.rounds[roundIndex + 1];
@@ -48,10 +55,33 @@ function resolveNextMatchId(
     return null;
   }
 
-  // 標準的なシングルエリミネーション規則: 2試合が次ラウンドの1試合に収束する
   const targetIndex = Math.floor(matchIndex / 2);
-  const targetMatch = nextRound.matches[targetIndex];
-  return targetMatch ? targetMatch.id : null;
+  return nextRound.matches[targetIndex] ?? null;
+}
+
+/**
+ * 指定されたチームキーがこの試合で勝利して次ラウンドへ進んだ（または両試合に登場する）かを判定する
+ */
+function isConnectorHighlightedForTeam(
+  fromMatch: Match,
+  toMatch: Match,
+  highlightedTeamKey: string | null,
+): boolean {
+  if (!highlightedTeamKey) {
+    return false;
+  }
+
+  const inFromAsWinner = fromMatch.teams.some(
+    (team) => getTeamKey(team) === highlightedTeamKey && Boolean(team?.isWinner),
+  );
+  if (inFromAsWinner) {
+    return true;
+  }
+
+  // 勝者フラグが未設定でも、前後両方の試合に同じチームがいれば勝ち上がりパスとみなす
+  const inFrom = fromMatch.teams.some((team) => getTeamKey(team) === highlightedTeamKey);
+  const inTo = toMatch.teams.some((team) => getTeamKey(team) === highlightedTeamKey);
+  return inFrom && inTo;
 }
 
 /**
@@ -63,12 +93,12 @@ export function drawConnectors(
   data: BracketData,
   matchElements: Map<string, HTMLElement>,
   connectorType: ConnectorType = 'orthogonal',
+  highlightedTeamKey: string | null = null,
 ): void {
   const rootRect = rootEl.getBoundingClientRect();
   const width = Math.max(rootEl.scrollWidth, Math.ceil(rootRect.width));
   const height = Math.max(rootEl.scrollHeight, Math.ceil(rootRect.height));
 
-  // コンテナが非表示などでサイズ0の場合はスキップする
   if (width === 0 || height === 0) {
     svgEl.replaceChildren();
     return;
@@ -80,19 +110,20 @@ export function drawConnectors(
 
   const normalSpecs: ConnectorSpec[] = [];
   const winnerSpecs: ConnectorSpec[] = [];
+  const highlightedSpecs: ConnectorSpec[] = [];
 
   for (let roundIndex = 0; roundIndex < data.rounds.length - 1; roundIndex++) {
     const round = data.rounds[roundIndex];
 
     for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
       const match = round.matches[matchIndex];
-      const nextMatchId = resolveNextMatchId(data, roundIndex, matchIndex, match);
-      if (!nextMatchId) {
+      const nextMatch = resolveNextMatch(data, roundIndex, matchIndex, match);
+      if (!nextMatch) {
         continue;
       }
 
       const fromEl = matchElements.get(match.id);
-      const toEl = matchElements.get(nextMatchId);
+      const toEl = matchElements.get(nextMatch.id);
       if (!fromEl || !toEl) {
         continue;
       }
@@ -100,21 +131,30 @@ export function drawConnectors(
       const fromRect = fromEl.getBoundingClientRect();
       const toRect = toEl.getBoundingClientRect();
 
-      // ルート要素左上を原点とした相対座標を計算
+      // ラウンドナビゲーション等で非表示（サイズ0）の要素間は接続線を描画しない
+      if (fromRect.width === 0 || fromRect.height === 0 || toRect.width === 0 || toRect.height === 0) {
+        continue;
+      }
+
       const x1 = fromRect.right - rootRect.left;
       const y1 = fromRect.top + fromRect.height / 2 - rootRect.top;
       const x2 = toRect.left - rootRect.left;
       const y2 = toRect.top + toRect.height / 2 - rootRect.top;
 
       const isWinner = match.teams.some((team) => Boolean(team?.isWinner));
+      const isHighlighted = isConnectorHighlightedForTeam(match, nextMatch, highlightedTeamKey);
+
       const spec: ConnectorSpec = {
         d: buildPathData(x1, y1, x2, y2, connectorType),
         isWinner,
+        isHighlighted,
         fromId: match.id,
-        toId: nextMatchId,
+        toId: nextMatch.id,
       };
 
-      if (isWinner) {
+      if (isHighlighted) {
+        highlightedSpecs.push(spec);
+      } else if (isWinner) {
         winnerSpecs.push(spec);
       } else {
         normalSpecs.push(spec);
@@ -124,14 +164,19 @@ export function drawConnectors(
 
   const fragment = document.createDocumentFragment();
 
-  // 通常の接続線を先に描画し、勝者の接続線を後から描画して前面に表示する
-  for (const spec of [...normalSpecs, ...winnerSpecs]) {
+  // 通常線 -> 勝者線 -> ハイライト線 の順に描画して重なり時の視認性を高める
+  for (const spec of [...normalSpecs, ...winnerSpecs, ...highlightedSpecs]) {
     const path = document.createElementNS(SVG_NS, 'path');
     path.setAttribute('d', spec.d);
-    path.setAttribute(
-      'class',
-      spec.isWinner ? 'ml-connector ml-connector--winner' : 'ml-connector',
-    );
+
+    const classes = ['ml-connector'];
+    if (spec.isWinner) {
+      classes.push('ml-connector--winner');
+    }
+    if (spec.isHighlighted) {
+      classes.push('ml-connector--highlighted');
+    }
+    path.setAttribute('class', classes.join(' '));
     path.setAttribute('data-from', spec.fromId);
     path.setAttribute('data-to', spec.toId);
     fragment.appendChild(path);

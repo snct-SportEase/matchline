@@ -1,5 +1,5 @@
 /* ==========================================================================
-   matchline デフォルトスタイルシート
+   matchline デフォルトスタイルシート（Bracketry インスパイア・クリーンデザイン）
    CSSカスタムプロパティを上書きすることで簡単にテーマ変更が可能です
    ========================================================================== */
 
@@ -7,52 +7,76 @@
   /* タイポグラフィ・背景 */
   --ml-font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --ml-bg: transparent;
-  --ml-padding: 16px;
+  --ml-padding: 18px 16px 24px;
 
   /* レイアウト間隔 */
   --ml-round-gap: 48px;
-  --ml-match-gap: 16px;
+  --ml-match-gap: 18px;
 
   /* 試合カード */
-  --ml-card-width: 210px;
+  --ml-card-width: 244px;
   --ml-card-bg: #ffffff;
-  --ml-card-border: #d8dee4;
-  --ml-card-border-hover: #0969da;
-  --ml-card-radius: 8px;
-  --ml-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
-  --ml-card-shadow-hover: 0 4px 12px rgba(9, 105, 218, 0.14);
+  --ml-card-border: #e2e8f0;
+  --ml-card-border-hover: #94a3b8;
+  --ml-card-radius: 10px;
+  --ml-card-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --ml-card-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.08);
 
   /* テキスト・区切り線 */
-  --ml-text-color: #1f2328;
-  --ml-text-muted: #6e7781;
-  --ml-seed-color: #6e7781;
-  --ml-divider-color: #eaeef2;
+  --ml-text-color: #0f172a;
+  --ml-text-muted: #94a3b8;
+  --ml-seed-color: #64748b;
+  --ml-divider-color: #f1f5f9;
 
   /* スコア */
-  --ml-score-bg: #f6f8fa;
-  --ml-score-color: #1f2328;
+  --ml-score-bg: transparent;
+  --ml-score-color: #475569;
+  --ml-score-divider: #f1f5f9;
 
-  /* 勝者ハイライト */
-  --ml-winner-bg: #f0f7ff;
-  --ml-winner-color: #0969da;
-  --ml-winner-score-bg: #0969da;
-  --ml-winner-score-color: #ffffff;
+  /* 勝者スタイル */
+  --ml-winner-bg: transparent;
+  --ml-winner-color: #0f172a;
+  --ml-winner-score-bg: transparent;
+  --ml-winner-score-color: #0f172a;
+  --ml-winner-accent: #2563eb;
+
+  /* 勝ち上がりパス・ハイライト */
+  --ml-highlight-color: #2563eb;
+  --ml-highlight-bg: rgba(37, 99, 235, 0.08);
+  --ml-highlight-border: #2563eb;
+  --ml-dim-opacity: 0.35;
+
+  /* LIVE表示 */
+  --ml-live-color: #ef4444;
+  --ml-live-bg: rgba(239, 68, 68, 0.1);
+  --ml-serving-color: #22c55e;
 
   /* ラウンド見出し */
-  --ml-header-color: #57606a;
-  --ml-header-bg: transparent;
-  --ml-header-margin-bottom: 16px;
+  --ml-header-color: #64748b;
+  --ml-header-border: #e2e8f0;
+  --ml-header-margin-bottom: 18px;
+
+  /* ナビゲーションバー */
+  --ml-nav-bg: #f8fafc;
+  --ml-nav-border: #e2e8f0;
+  --ml-nav-text: #475569;
+  --ml-nav-active-bg: #ffffff;
+  --ml-nav-active-text: #0f172a;
+  --ml-nav-active-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 
   /* SVG接続線（コネクタ） */
   --ml-line-color: #cbd5e1;
-  --ml-line-active-color: #0969da;
-  --ml-line-width: 2px;
+  --ml-line-active-color: #94a3b8;
+  --ml-line-highlight-color: #2563eb;
+  --ml-line-width: 1.75px;
+  --ml-line-highlight-width: 2.5px;
 
   font-family: var(--ml-font-family);
   background: var(--ml-bg);
   color: var(--ml-text-color);
-  overflow-x: auto;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 .ml-container *,
@@ -61,7 +85,96 @@
   box-sizing: border-box;
 }
 
-/* SVGの座標基準となる内側ルート */
+/* ==========================================================================
+   ラウンドナビゲーションバー
+   ========================================================================== */
+.ml-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--ml-nav-bg);
+  border-bottom: 1px solid var(--ml-nav-border);
+}
+
+.ml-nav[hidden] {
+  display: none;
+}
+
+.ml-nav-btn {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ml-nav-border);
+  border-radius: 7px;
+  background: var(--ml-nav-active-bg);
+  color: var(--ml-nav-active-text);
+  font-size: 1.125rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.ml-nav-btn:hover:not(:disabled) {
+  border-color: var(--ml-card-border-hover);
+}
+
+.ml-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.ml-nav-pills {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.ml-nav-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.ml-nav-pill {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ml-nav-text);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ml-nav-pill:hover {
+  color: var(--ml-nav-active-text);
+}
+
+.ml-nav-pill--active {
+  background: var(--ml-nav-active-bg);
+  color: var(--ml-nav-active-text);
+  font-weight: 600;
+  border-color: var(--ml-nav-border);
+  box-shadow: var(--ml-nav-active-shadow);
+}
+
+/* ==========================================================================
+   スクロールビューポート & SVG座標基準ルート
+   ========================================================================== */
+.ml-viewport {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .ml-root {
   position: relative;
   display: inline-block;
@@ -86,14 +199,26 @@
   stroke-width: var(--ml-line-width);
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: stroke 0.15s ease;
+  transition: stroke 0.18s ease, stroke-width 0.18s ease, opacity 0.18s ease;
 }
 
 .ml-connector--winner {
   stroke: var(--ml-line-active-color);
 }
 
-/* ラウンド列コンテナ */
+.ml-has-highlight .ml-connector {
+  opacity: var(--ml-dim-opacity);
+}
+
+.ml-has-highlight .ml-connector--highlighted {
+  opacity: 1;
+  stroke: var(--ml-line-highlight-color);
+  stroke-width: var(--ml-line-highlight-width);
+}
+
+/* ==========================================================================
+   ラウンド列・試合カードレイアウト
+   ========================================================================== */
 .ml-rounds {
   position: relative;
   z-index: 1;
@@ -103,7 +228,6 @@
   gap: var(--ml-round-gap);
 }
 
-/* 各ラウンド列 */
 .ml-round {
   display: flex;
   flex-direction: column;
@@ -111,16 +235,21 @@
   flex-shrink: 0;
 }
 
-/* ラウンド見出し */
+.ml-round--hidden {
+  display: none;
+}
+
+/* ラウンド見出し（Bracketry風のクリーンな下線ヘッダー） */
 .ml-round-header {
-  font-size: 0.8125rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--ml-header-color);
-  background: var(--ml-header-bg);
   text-align: center;
-  padding: 6px 8px;
+  padding: 0 8px 10px;
   margin-bottom: var(--ml-header-margin-bottom);
+  border-bottom: 1px solid var(--ml-header-border);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -150,9 +279,9 @@
   box-shadow: var(--ml-card-shadow);
   overflow: hidden;
   transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
 }
 
 .ml-match--clickable {
@@ -165,29 +294,122 @@
 }
 
 .ml-match--clickable:focus-visible {
-  outline: 2px solid var(--ml-card-border-hover);
+  outline: 2px solid var(--ml-highlight-color);
   outline-offset: 2px;
 }
 
-/* チームスロット行 */
-.ml-team {
+.ml-match--live {
+  border-color: var(--ml-live-color);
+}
+
+.ml-match--highlighted {
+  border-color: var(--ml-highlight-border);
+  box-shadow: 0 0 0 1px var(--ml-highlight-border), var(--ml-card-shadow-hover);
+}
+
+/* 試合ヘッダー（ラベル・LIVEバッジ） */
+.ml-match-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  padding: 5px 10px;
+  font-size: 0.7rem;
+  color: var(--ml-text-muted);
+  border-bottom: 1px solid var(--ml-divider-color);
+  background: var(--ml-nav-bg);
+}
+
+.ml-match-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ml-live-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ml-live-bg);
+  color: var(--ml-live-color);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.ml-live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ml-live-color);
+  animation: ml-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes ml-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: scale(0.8);
+  }
+}
+
+/* ==========================================================================
+   チームスロット行 & スコア
+   ========================================================================== */
+.ml-match-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.ml-team {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   min-height: 36px;
-  padding: 0 0 0 10px;
-  font-size: 0.875rem;
+  padding: 0 0 0 11px;
+  font-size: 0.85rem;
   line-height: 1.25;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
 
 .ml-team + .ml-team {
   border-top: 1px solid var(--ml-divider-color);
 }
 
+.ml-team--interactive {
+  cursor: pointer;
+}
+
+.ml-team--interactive:hover {
+  background: var(--ml-highlight-bg);
+}
+
+/* 勝者インジケータ（左端の細いアクセントバー + 太字） */
 .ml-team--winner {
   background: var(--ml-winner-bg);
   color: var(--ml-winner-color);
   font-weight: 600;
+}
+
+.ml-team--winner::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--ml-winner-accent);
 }
 
 .ml-team--tbd,
@@ -196,46 +418,134 @@
   font-style: italic;
 }
 
+/* 勝ち上がりパス・ハイライト状態 */
+.ml-has-highlight .ml-team:not(.ml-team--highlighted) {
+  opacity: 0.55;
+}
+
+.ml-team--highlighted {
+  background: var(--ml-highlight-bg);
+  color: var(--ml-highlight-color);
+  font-weight: 600;
+  opacity: 1;
+}
+
+.ml-team--highlighted::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--ml-highlight-color);
+}
+
 /* シード番号 */
 .ml-team-seed {
   flex-shrink: 0;
-  min-width: 18px;
-  font-size: 0.75rem;
+  min-width: 16px;
+  font-size: 0.72rem;
   font-weight: 600;
   color: var(--ml-seed-color);
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* チーム名（長い場合は省略記号で切り詰め） */
+/* 国旗 / バッジ */
+.ml-team-flag {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* チーム名（長い場合は省略） */
 .ml-team-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-right: 8px;
+  padding-right: 6px;
 }
 
-/* スコア表示 */
-.ml-team-score {
+/* サーブ権ドット */
+.ml-team-serving {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ml-serving-color);
+  margin-right: 4px;
+}
+
+/* スコア群（単一・複数セット共通） */
+.ml-team-scores {
   flex-shrink: 0;
   display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  border-left: 1px solid var(--ml-score-divider);
+}
+
+.ml-team-score {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 34px;
-  align-self: stretch;
-  padding: 0 8px;
+  min-width: 30px;
+  padding: 0 7px;
   background: var(--ml-score-bg);
   color: var(--ml-score-color);
   font-size: 0.8125rem;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
-  border-left: 1px solid var(--ml-divider-color);
+}
+
+.ml-team-scores--multi .ml-team-score {
+  min-width: 24px;
+  padding: 0 5px;
+}
+
+.ml-team-scores--multi .ml-team-score + .ml-team-score {
+  border-left: 1px solid var(--ml-score-divider);
+}
+
+.ml-team-score--set-winner {
+  color: var(--ml-winner-score-color);
+  font-weight: 700;
+}
+
+.ml-team-score-sub {
+  font-size: 0.62rem;
+  line-height: 1;
+  margin-left: 1px;
+  vertical-align: super;
+  opacity: 0.8;
 }
 
 .ml-team--winner .ml-team-score {
   background: var(--ml-winner-score-bg);
   color: var(--ml-winner-score-color);
-  border-left-color: transparent;
+  font-weight: 700;
+}
+
+.ml-team--highlighted .ml-team-score {
+  color: var(--ml-highlight-color);
+}
+
+/* ==========================================================================
+   3位決定戦ブロック
+   ========================================================================== */
+.ml-third-place {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--ml-header-border);
+}
+
+.ml-third-place-header {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ml-header-color);
+  text-align: center;
+  margin-bottom: 10px;
 }

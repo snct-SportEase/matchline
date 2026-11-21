@@ -11,11 +11,11 @@ body {
 }
 
 .demo-page {
-  max-width: 1120px;
+  max-width: 1160px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 .demo-header {
@@ -33,7 +33,7 @@ body {
 
 .demo-subtitle {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   color: #475569;
 }
 
@@ -41,75 +41,89 @@ body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .demo-control {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   color: #334155;
 }
 
 .demo-controls select,
 .demo-controls button {
   padding: 6px 10px;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   border: 1px solid #cbd5e1;
-  border-radius: 6px;
+  border-radius: 7px;
   background: #ffffff;
   color: #0f172a;
   cursor: pointer;
 }
 
+.demo-controls button {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+  font-weight: 500;
+}
+
 .demo-controls button:hover {
-  background: #f1f5f9;
+  background: #1e293b;
 }
 
 .demo-stage {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 12px;
+  overflow: hidden;
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 /* ダークテーマ（CSSカスタムプロパティ上書き例） */
 .demo-stage[data-theme='dark'] {
-  background: #0f172a;
+  background: #0b1120;
   border-color: #1e293b;
 }
 
 .demo-stage[data-theme='dark'] .ml-container {
   --ml-card-bg: #1e293b;
   --ml-card-border: #334155;
-  --ml-card-border-hover: #38bdf8;
+  --ml-card-border-hover: #64748b;
   --ml-card-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
   --ml-text-color: #f1f5f9;
   --ml-text-muted: #94a3b8;
   --ml-seed-color: #94a3b8;
   --ml-divider-color: #334155;
-  --ml-score-bg: #0f172a;
-  --ml-score-color: #e2e8f0;
-  --ml-winner-bg: rgba(56, 189, 248, 0.12);
-  --ml-winner-color: #38bdf8;
-  --ml-winner-score-bg: #0284c7;
+  --ml-score-color: #cbd5e1;
+  --ml-score-divider: #334155;
+  --ml-winner-color: #ffffff;
   --ml-winner-score-color: #ffffff;
+  --ml-winner-accent: #38bdf8;
+  --ml-highlight-color: #38bdf8;
+  --ml-highlight-bg: rgba(56, 189, 248, 0.14);
+  --ml-highlight-border: #38bdf8;
   --ml-header-color: #94a3b8;
-  --ml-line-color: #475569;
-  --ml-line-active-color: #38bdf8;
+  --ml-header-border: #1e293b;
+  --ml-nav-bg: #0f172a;
+  --ml-nav-border: #1e293b;
+  --ml-nav-text: #94a3b8;
+  --ml-nav-active-bg: #1e293b;
+  --ml-nav-active-text: #f8fafc;
+  --ml-line-color: #334155;
+  --ml-line-active-color: #64748b;
+  --ml-line-highlight-color: #38bdf8;
 }
 
 /* エメラルドテーマ（CSSカスタムプロパティ上書き例） */
 .demo-stage[data-theme='emerald'] .ml-container {
-  --ml-card-border: #a7f3d0;
-  --ml-card-border-hover: #059669;
-  --ml-winner-bg: #ecfdf5;
-  --ml-winner-color: #047857;
-  --ml-winner-score-bg: #059669;
-  --ml-line-color: #cbd5e1;
-  --ml-line-active-color: #059669;
+  --ml-winner-accent: #059669;
+  --ml-highlight-color: #059669;
+  --ml-highlight-bg: rgba(5, 150, 105, 0.09);
+  --ml-highlight-border: #059669;
+  --ml-line-highlight-color: #059669;
 }
 
 .demo-log {
@@ -121,12 +135,12 @@ body {
 
 .demo-log h2 {
   margin: 0 0 6px;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   color: #475569;
 }
 
 .demo-log p {
   margin: 0;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

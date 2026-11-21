@@ -1,16 +1,19 @@
 # matchline
 
 依存ゼロ・Vanilla TypeScript製のトーナメント表（ブラケット）描画ライブラリです。
-React や Vue などのフレームワークに依存せず、Pure DOM API と SVG API のみで動作します。
+[bracketry](https://bracketry.app/) の使い勝手を参考に、React や Vue などのフレームワークに依存せず Pure DOM API と SVG API のみで動作するよう設計されています。
 
-## 特徴
+## 主な特徴
 
 - **ランタイム依存ゼロ**: 軽量でどのフロントエンド環境でも利用可能
 - **ハイブリッド描画**:
   - 試合カードは HTML DOM（Flexbox）で構築し、テキスト省略・CSSカスタマイズ・イベント処理が容易
   - 接続線（コネクタ）は背面 `<svg>` に `<path>` で描画し、`ResizeObserver` によりリサイズ時も自動追従
+- **勝ち上がりパス・ハイライト**: チームをクリックまたはホバーすると、そのチームの全ラウンドの戦績とSVG接続線を強調表示
+- **ラウンドナビゲーション＆モバイル対応**: 左右ボタン・ラウンドピルで移動可能。`visibleRoundsCount` 指定時は表示ラウンドを絞ってコンパクトに表示
+- **競技に合わせた表現**: 単一スコア・複数セットスコア（タイブレーク上付き表記含む）、`LIVE` バッジ、サーブ権ドット、3位決定戦に対応
+- **拡張性**: `renderTeam` / `renderMatchHeader` によるカスタムレンダリングと、`updateMatches()` による特定試合の部分更新APIを提供
 - **テーマカスタマイズ**: CSSカスタムプロパティ（`--ml-*`）で簡単に見た目を変更可能
-- **TypeScript完全対応**: 型定義ファイル（`.d.ts`）を同梱
 
 ## インストール
 
@@ -31,16 +34,19 @@ const data: BracketData = {
       matches: [
         {
           id: 'm1',
+          label: 'Court 1 · 13:00',
+          status: 'completed',
           teams: [
-            { name: 'チームA', score: 2, isWinner: true },
-            { name: 'チームB', score: 1 },
+            { id: 't1', seed: 1, name: 'チームA', score: [6, { main: 7, sub: 5, isWinner: true }], isWinner: true },
+            { id: 't2', seed: 4, name: 'チームB', score: [4, { main: 6, sub: 3 }] },
           ],
         },
         {
           id: 'm2',
+          status: 'completed',
           teams: [
-            { name: 'チームC', score: 0 },
-            { name: 'チームD', score: 3, isWinner: true },
+            { id: 't3', seed: 2, name: 'チームC', score: [3, 4] },
+            { id: 't4', seed: 3, name: 'チームD', score: [6, 6], isWinner: true },
           ],
         },
       ],
@@ -50,29 +56,54 @@ const data: BracketData = {
       matches: [
         {
           id: 'm3',
+          label: 'Center Court',
+          status: 'live',
           teams: [
-            { name: 'チームA', score: null },
-            { name: 'チームD', score: null },
+            { id: 't1', seed: 1, name: 'チームA', score: [6, 4], isServing: true },
+            { id: 't4', seed: 3, name: 'チームD', score: [4, 4] },
           ],
         },
       ],
     },
   ],
+  thirdPlaceTitle: '3位決定戦',
+  thirdPlaceMatch: {
+    id: 'm-3rd',
+    status: 'scheduled',
+    teams: [
+      { id: 't2', seed: 4, name: 'チームB', score: null },
+      { id: 't3', seed: 2, name: 'チームC', score: null },
+    ],
+  },
 };
 
 const container = document.getElementById('bracket')!;
 const bracket = createBracket(container, data, {
   connectorType: 'orthogonal', // 'orthogonal' | 'curved'
-  onMatchClick: (match, context) => {
-    console.log('クリックされた試合:', match.id, context.round.name);
+  highlightTeamHistory: true,
+  highlightTrigger: 'click', // 'click' | 'hover'
+  showNavigation: true,
+  onMatchClick: (match, ctx) => {
+    console.log('試合クリック:', match.id, ctx.round?.name);
   },
 });
 
-// データの更新
-// bracket.update(newData);
+// 特定試合のみを部分更新（ライブスコア更新など）
+bracket.updateMatches([
+  {
+    id: 'm3',
+    status: 'completed',
+    teams: [
+      { id: 't1', seed: 1, name: 'チームA', score: [6, 6], isWinner: true },
+      { id: 't4', seed: 3, name: 'チームD', score: [4, 4] },
+    ],
+  },
+]);
 
-// 破棄（DOM・イベント・ResizeObserverのクリーンアップ）
-// bracket.destroy();
+// プログラムからの操作
+bracket.highlightTeam('t1');
+bracket.moveToNextRound();
+bracket.destroy();
 ```
 
 ## CSSカスタムプロパティによるテーマ変更
@@ -84,8 +115,9 @@ const bracket = createBracket(container, data, {
   --ml-card-bg: #1e293b;
   --ml-card-border: #334155;
   --ml-text-color: #f1f5f9;
-  --ml-line-color: #475569;
-  --ml-line-active-color: #38bdf8;
+  --ml-line-color: #334155;
+  --ml-line-highlight-color: #38bdf8;
+  --ml-highlight-color: #38bdf8;
 }
 ```
 

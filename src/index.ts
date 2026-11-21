@@ -4,6 +4,7 @@ export {
   type GenerateBracketOptions,
   type SeedContestantInput,
 } from './generator';
+export { recordMatchResult, type RecordMatchResultInput } from './progression';
 export type {
   BracketData,
   BracketInstance,

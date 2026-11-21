@@ -106,6 +106,23 @@ function buildStyleVarOverrides(options: BracketOptions): Record<string, string>
   return vars;
 }
 
+type HighlightState =
+  | { type: 'none' }
+  | { type: 'contestant'; key: string }
+  | { type: 'venue'; venue: string }
+  | { type: 'live' };
+
+/**
+ * 試合の venue が指定されたコートIDまたはコート名に一致するか判定する
+ */
+function matchesVenue(match: Match, targetVenue: string): boolean {
+  if (!match.venue) return false;
+  if (typeof match.venue === 'string') {
+    return match.venue === targetVenue;
+  }
+  return match.venue.id === targetVenue || match.venue.name === targetVenue;
+}
+
 /**
  * 指定されたコンテナ要素内にトーナメント表（ブラケット）を描画する
  *
@@ -144,7 +161,7 @@ export function createBracket(
   let currentOptions: BracketOptions = { ...options };
   let baseRoundIndex = Math.max(0, options.initialBaseRoundIndex ?? 0);
   let autoVisibleRoundsCount: number | null = null;
-  let highlightedContestantKey: string | null = null;
+  let highlightState: HighlightState = { type: 'none' };
   let appliedCustomStyleKeys: string[] = [];
   let renderResult: RenderResult | null = null;
   let rafId: number | null = null;
@@ -339,30 +356,48 @@ export function createBracket(
   };
 
   /**
-   * 現在の highlightedContestantKey をDOM要素へ反映する
+   * 現在の highlightState をDOM要素へ反映する
    */
   const applyHighlightToDOM = (): void => {
     if (isDestroyed || !renderResult) {
       return;
     }
 
-    const activeKey = isHighlightEnabled() ? highlightedContestantKey : null;
-    rootEl.classList.toggle('ml-has-highlight', activeKey !== null);
+    const activeState: HighlightState =
+      highlightState.type === 'contestant' && !isHighlightEnabled()
+        ? { type: 'none' }
+        : highlightState;
+
+    const isContestantMode = activeState.type === 'contestant';
+    const isMatchFilterMode = activeState.type === 'venue' || activeState.type === 'live';
+
+    rootEl.classList.toggle('ml-has-highlight', isContestantMode);
+    rootEl.classList.toggle('ml-has-match-highlight', isMatchFilterMode);
 
     const sideEls = rootEl.querySelectorAll<HTMLElement>('.ml-team');
     for (const sideEl of sideEls) {
-      const isMatch = activeKey !== null && sideEl.dataset.contestantKey === activeKey;
+      const isMatch =
+        isContestantMode && sideEl.dataset.contestantKey === activeState.key;
       sideEl.classList.toggle('ml-team--highlighted', isMatch);
     }
 
     for (const [matchKey, cardEl] of renderResult.matchElements.entries()) {
       const meta = renderResult.matchMetaMap.get(matchKey);
-      const hasContestant =
-        activeKey !== null &&
-        Boolean(
-          (meta?.match.sides ?? []).some((side) => getContestantKey(side) === activeKey),
-        );
-      cardEl.classList.toggle('ml-match--highlighted', hasContestant);
+      let isHighlighted = false;
+
+      if (meta) {
+        if (activeState.type === 'contestant') {
+          isHighlighted = (meta.match.sides ?? []).some(
+            (side) => getContestantKey(side) === activeState.key,
+          );
+        } else if (activeState.type === 'venue') {
+          isHighlighted = matchesVenue(meta.match, activeState.venue);
+        } else if (activeState.type === 'live') {
+          isHighlighted = Boolean(meta.match.isLive);
+        }
+      }
+
+      cardEl.classList.toggle('ml-match--highlighted', isHighlighted);
     }
   };
 
@@ -373,13 +408,17 @@ export function createBracket(
     if (isDestroyed || !renderResult) {
       return;
     }
+    const contestantKey =
+      highlightState.type === 'contestant' && isHighlightEnabled()
+        ? highlightState.key
+        : null;
     drawConnectors(
       rootEl,
       renderResult.svgElement,
       renderResult.normalizedRounds,
       renderResult.matchElements,
       currentOptions.connectorType ?? 'orthogonal',
-      isHighlightEnabled() ? highlightedContestantKey : null,
+      contestantKey,
     );
     updateScrollButtonsState();
   };
@@ -478,15 +517,37 @@ export function createBracket(
   };
 
   /**
+   * ハイライト状態を切り替える
+   */
+  const setHighlightState = (next: HighlightState): void => {
+    if (isDestroyed) {
+      return;
+    }
+    highlightState = next;
+    applyHighlightToDOM();
+    redrawConnectors();
+  };
+
+  /**
    * 参加者のハイライト状態を切り替える
    */
   const setHighlight = (contestantKey: string | null): void => {
-    if (isDestroyed || highlightedContestantKey === contestantKey) {
+    if (
+      contestantKey === null &&
+      highlightState.type === 'none'
+    ) {
       return;
     }
-    highlightedContestantKey = contestantKey;
-    applyHighlightToDOM();
-    redrawConnectors();
+    if (
+      contestantKey !== null &&
+      highlightState.type === 'contestant' &&
+      highlightState.key === contestantKey
+    ) {
+      return;
+    }
+    setHighlightState(
+      contestantKey ? { type: 'contestant', key: contestantKey } : { type: 'none' },
+    );
   };
 
   /**
@@ -542,9 +603,11 @@ export function createBracket(
           : null;
 
       if (isHighlightEnabled() && (currentOptions.highlightTrigger ?? 'click') === 'click') {
-        setHighlight(
-          contestantKey && highlightedContestantKey === contestantKey ? null : contestantKey,
-        );
+        const isAlreadySelected =
+          contestantKey !== null &&
+          highlightState.type === 'contestant' &&
+          highlightState.key === contestantKey;
+        setHighlight(isAlreadySelected ? null : contestantKey);
       }
 
       const sideClickCtx = {
@@ -807,6 +870,18 @@ export function createBracket(
 
     highlightContestantHistory(contestantId: string | null): void {
       setHighlight(contestantId);
+    },
+
+    highlightVenue(venue: string | null): void {
+      setHighlightState(venue ? { type: 'venue', venue } : { type: 'none' });
+    },
+
+    highlightLiveMatches(active = true): void {
+      setHighlightState(active ? { type: 'live' } : { type: 'none' });
+    },
+
+    clearHighlight(): void {
+      setHighlightState({ type: 'none' });
     },
 
     focusContestant(contestantId: string): boolean {

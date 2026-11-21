@@ -318,6 +318,9 @@ const sizeSelect = document.getElementById('size-select') as HTMLSelectElement |
 const visibleRoundsSelect = document.getElementById(
   'visible-rounds-select',
 ) as HTMLSelectElement | null;
+const highlightFilterSelect = document.getElementById(
+  'highlight-filter-select',
+) as HTMLSelectElement | null;
 const liveUpdateBtn = document.getElementById('live-update-btn') as HTMLButtonElement | null;
 const teamSearchInput = document.getElementById('team-search-input') as HTMLInputElement | null;
 const teamSearchBtn = document.getElementById('team-search-btn') as HTMLButtonElement | null;
@@ -336,12 +339,13 @@ const getContestantTitle = (contestantId: string | undefined): string => {
   return contestant.players.map((p) => p.title).join(' / ');
 };
 
-// テーマ・接続線・パス強調はコード側オプションで事前指定する
+// テーマ・接続線・パス強調・通し試合番号はコード側オプションで事前指定する
 const bracket = createBracket(currentData, container, {
   theme: 'light', // 'light' | 'dark' | 'emerald' または CSS変数マップ
   connectorType: 'orthogonal', // 'orthogonal' | 'curved'
   highlightContestantHistory: true,
   highlightTrigger: 'click', // 'click' | 'hover'
+  autoMatchNumbers: true, // 通し試合番号（#1〜）と未定枠の「#Xの勝者」表示を有効化
   showNavigation: true,
   onSideClick: (side, ctx) => {
     if (!clickLogEl) return;
@@ -368,9 +372,24 @@ sizeSelect?.addEventListener('change', () => {
   currentData = size === 8 ? createInitialData() : createLargeSampleData(size);
   liveStep = 0;
 
-  bracket.highlightContestantHistory(null);
+  bracket.clearHighlight();
+  if (highlightFilterSelect) {
+    highlightFilterSelect.value = 'none';
+  }
   bracket.setBaseRoundIndex(0);
   bracket.replaceData(currentData);
+});
+
+// コート別 / LIVE試合のみの強調フィルター
+highlightFilterSelect?.addEventListener('change', () => {
+  const val = highlightFilterSelect.value;
+  if (val === 'none') {
+    bracket.clearHighlight();
+  } else if (val === 'live') {
+    bracket.highlightLiveMatches(true);
+  } else {
+    bracket.highlightVenue(val);
+  }
 });
 
 // 参加者名部分一致で検索してフォーカス＆ハイライトする

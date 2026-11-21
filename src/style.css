@@ -520,6 +520,15 @@
   box-shadow: 0 0 0 1px var(--ml-highlight-border), var(--ml-card-shadow-hover);
 }
 
+/* コート別 / LIVE強調モード時は非該当カード・接続線を控えめにフェードする */
+.ml-has-match-highlight .ml-match:not(.ml-match--highlighted) {
+  opacity: var(--ml-dim-opacity);
+}
+
+.ml-has-match-highlight .ml-connector {
+  opacity: var(--ml-dim-opacity);
+}
+
 /* 試合ヘッダー（会場・ラベル・開始時間・LIVEバッジ） */
 .ml-match-header {
   display: flex;
@@ -547,6 +556,18 @@
   align-items: center;
   gap: 6px;
   margin-left: auto;
+}
+
+.ml-match-number {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--ml-card-border);
+  color: var(--ml-text-color);
+  line-height: 1.3;
 }
 
 .ml-match-venue {
@@ -840,4 +861,43 @@
   color: var(--ml-header-color);
   text-align: center;
   margin-bottom: 10px;
+}
+
+/* ==========================================================================
+   印刷用スタイル（会場掲示・PDF出力対応）
+   ========================================================================== */
+@media print {
+  .ml-container {
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ml-nav,
+  .ml-side-nav-btn,
+  .ml-scroll-btn {
+    display: none !important;
+  }
+
+  .ml-viewport {
+    overflow: visible !important;
+  }
+
+  .ml-round-header {
+    position: static !important;
+    border-bottom-color: #94a3b8;
+  }
+
+  .ml-match {
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    border-color: #64748b;
+  }
+
+  .ml-connector {
+    stroke: #64748b;
+  }
 }

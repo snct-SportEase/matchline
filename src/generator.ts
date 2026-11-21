@@ -104,11 +104,13 @@ export function generateBracketData(
     const roundMatches: Match[] = [];
     for (let order = 0; order < matchCount; order++) {
       const venue = venues ? venues[(globalMatchSeq - 1) % venues.length] : undefined;
+      const matchNumber = globalMatchSeq;
       globalMatchSeq++;
 
       roundMatches.push({
         roundIndex,
         order,
+        matchNumber,
         venue,
         sides: [],
       });
@@ -159,6 +161,7 @@ export function generateBracketData(
     matches.push({
       roundIndex: totalRounds - 1,
       order: 1,
+      matchNumber: globalMatchSeq,
       isBronzeMatch: true,
       venue: venues ? venues[0] : undefined,
       sides: [],

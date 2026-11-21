@@ -125,6 +125,34 @@ bracket.uninstall(); // または bracket.destroy()
 - **コールバック・状態**: `onMatchClick`, `onMatchSideClick` / `onSideClick`, `disableHighlight`, `getAllData()`, `getUserOptions()`
 - **JSスタイルオプション**: `rootBgColor`, `mainVerticalPadding`, `roundTitlesFontSize`, `roundTitlesFontColor`, `matchFontSize`, `matchTextColor`, `matchMinVerticalGap`, `matchMaxWidth`, `roundGap`, `distanceBetweenScorePairs`, `connectionLinesWidth`, `connectionLinesColor`, `highlightedConnectionLinesColor`, `highlightedPlayerTitleColor`, `liveMatchBorderColor`, `disableOpacity`
 
+## 大会運営向けユーティリティ・強調表示
+
+### 勝敗確定＆自動進出（`recordMatchResult`）
+
+```ts
+import { recordMatchResult } from 'matchline';
+
+// 試合結果を確定し、勝者を次ラウンド（準決勝の敗者は3位決定戦）へ自動進出させる
+const nextData = recordMatchResult(data, {
+  roundIndex: 0,
+  order: 0,
+  winnerSideIndex: 0,
+  scores: [
+    [{ mainScore: 6, isWinner: true }, { mainScore: 6, isWinner: true }],
+    [{ mainScore: 4 }, { mainScore: 3 }],
+  ],
+  matchStatus: '試合終了',
+});
+
+bracket.replaceData(nextData);
+```
+
+### 通し試合番号・進出元プレースホルダー・コート/LIVE強調・印刷対応
+
+- `autoMatchNumbers: true`（または各試合の `matchNumber`）を指定すると、`#1` 等の試合番号と未定枠の「`#1の勝者`」「`#5の敗者`」を自動表示します。
+- `bracket.highlightVenue('第1コート')` / `bracket.highlightLiveMatches()` / `bracket.clearHighlight()` で運営・審判向けの強調表示が可能です。
+- `style.css` に `@media print` 用の印刷スタイルを同梱しています。
+
 ## 大規模トーナメントの自動生成（`generateBracketData`）
 
 ```ts

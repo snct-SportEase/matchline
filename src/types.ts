@@ -85,6 +85,8 @@ export interface Match {
   // --- 以下 matchline 拡張フィールド（すべて任意） ---
   /** 明示的なマッチID（省略時は roundIndex / order から自動生成） */
   id?: string;
+  /** 通し試合番号（例: 12 → "#12"、または "M-12"） */
+  matchNumber?: number | string;
   /** 次ラウンドの接続先マッチID（変則トーナメント用・省略時は自動計算） */
   nextMatchId?: string;
   /** 試合開始日時（"14:00" 等の文字列、ISO 8601 文字列、または Date オブジェクト） */
@@ -272,6 +274,18 @@ export interface BracketOptions {
   showVenue?: boolean;
   /** 会場・コート（match.venue）の表示文字列をカスタム整形する関数 */
   formatVenue?: (venue: MatchVenue, match: Match) => string;
+  /** 通し試合番号（match.matchNumber）を表示するかどうか（デフォルト: true） */
+  showMatchNumber?: boolean;
+  /** matchNumber 未指定の試合にも1回戦から通し番号を自動採番するか（デフォルト: false） */
+  autoMatchNumbers?: boolean;
+  /** 試合番号の表示文字列をカスタム整形する関数（デフォルト: 数値なら "#1"） */
+  formatMatchNumber?: (matchNumber: number | string, match: Match) => string;
+  /** 2回戦以降の未定枠に「#1の勝者」「#5の敗者」等の進出元ラベルを表示するか（デフォルト: true） */
+  showSourcePlaceholder?: boolean;
+  /** 勝者進出元プレースホルダーのカスタム整形関数 */
+  formatWinnerPlaceholder?: (sourceMatchNumber: number | string, sourceMatch: Match) => string;
+  /** 敗者進出元プレースホルダー（3位決定戦等）のカスタム整形関数 */
+  formatLoserPlaceholder?: (sourceMatchNumber: number | string, sourceMatch: Match) => string;
 
   // --- インタラクション・コールバック ---
   /** 試合カードクリック（またはフォーカス時のEnter/Spaceキー）時のコールバック */
@@ -395,6 +409,12 @@ export interface BracketInstance {
   applyMatchesUpdates: (updates: MatchUpdate[]) => void;
   /** 指定した参加者ID（またはタイトル）の勝ち上がりパスをハイライト／解除する */
   highlightContestantHistory: (contestantId: string | null) => void;
+  /** 指定したコートIDまたはコート名に該当する試合だけを強調表示する（null で解除） */
+  highlightVenue: (venue: string | null) => void;
+  /** 進行中（isLive: true）の試合だけを強調表示する（false で解除） */
+  highlightLiveMatches: (active?: boolean) => void;
+  /** 参加者パス・コート・LIVEのすべてのハイライト状態を解除する */
+  clearHighlight: () => void;
   /** 指定した参加者をハイライトし、該当する試合カードへスクロールする */
   focusContestant: (contestantId: string) => boolean;
   /** 前のラウンドへ移動する */

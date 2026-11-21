@@ -269,6 +269,64 @@ function createScoresElement(
 }
 
 /**
+ * 試合番号のデフォルト整形（数値なら "#12"、文字列ならそのまま）
+ */
+function defaultFormatMatchNumber(matchNumber: number | string): string {
+  return typeof matchNumber === 'number' ? `#${matchNumber}` : matchNumber;
+}
+
+/**
+ * 進出元プレースホルダー文字列（"#1の勝者" / "#5の敗者"）を解決する
+ */
+function resolveSourcePlaceholder(
+  normalizedRounds: Match[][],
+  matchNumberMap: Map<string, number | string>,
+  match: Match,
+  sideIndex: 0 | 1,
+  isBronzeMatch: boolean,
+  options: BracketOptions,
+): string | null {
+  if (options.showSourcePlaceholder === false) {
+    return null;
+  }
+
+  let sourceMatch: Match | undefined;
+  let isLoser = false;
+
+  if (isBronzeMatch) {
+    // 3位決定戦は準決勝（最終の1つ前ラウンド）の敗者同士
+    const semiRound = normalizedRounds[normalizedRounds.length - 2];
+    sourceMatch = semiRound?.[sideIndex];
+    isLoser = true;
+  } else if (match.roundIndex > 0) {
+    // 通常試合は前ラウンドの order * 2 + sideIndex の勝者
+    const prevRound = normalizedRounds[match.roundIndex - 1];
+    sourceMatch = prevRound?.[match.order * 2 + sideIndex];
+  }
+
+  if (!sourceMatch) {
+    return null;
+  }
+
+  const sourceNum = matchNumberMap.get(getMatchKey(sourceMatch));
+  if (sourceNum === undefined) {
+    return null;
+  }
+
+  if (isLoser) {
+    if (typeof options.formatLoserPlaceholder === 'function') {
+      return options.formatLoserPlaceholder(sourceNum, sourceMatch);
+    }
+    return `${defaultFormatMatchNumber(sourceNum)}の敗者`;
+  }
+
+  if (typeof options.formatWinnerPlaceholder === 'function') {
+    return options.formatWinnerPlaceholder(sourceNum, sourceMatch);
+  }
+  return `${defaultFormatMatchNumber(sourceNum)}の勝者`;
+}
+
+/**
  * 単一の参加者スロット行（Side）のDOM要素を生成する
  */
 function createSideRow(
@@ -280,6 +338,7 @@ function createSideRow(
   options: BracketOptions,
   tbdLabel: string,
   byeLabel: string,
+  sourcePlaceholder: string | null,
 ): HTMLDivElement {
   const row = document.createElement('div');
   row.className = 'ml-team';
@@ -411,7 +470,7 @@ function createSideRow(
   } else {
     const nameEl = document.createElement('span');
     nameEl.className = 'ml-team-name';
-    const text = side?.title || tbdLabel;
+    const text = side?.title || sourcePlaceholder || tbdLabel;
     nameEl.textContent = text;
     nameEl.title = text;
     playersWrap.appendChild(nameEl);
@@ -439,10 +498,11 @@ function createSideRow(
 }
 
 /**
- * 試合カード上部のヘッダー行（会場・ラベル・開始時間・LIVEバッジ・カスタムヘッダー）を生成する
+ * 試合カード上部のヘッダー行（試合番号・会場・ラベル・開始時間・LIVEバッジ・カスタムヘッダー）を生成する
  */
 function createMatchHeader(
   match: Match,
+  resolvedMatchNumber: number | string | undefined,
   isBronzeMatch: boolean,
   options: BracketOptions,
 ): HTMLDivElement | null {
@@ -461,13 +521,17 @@ function createMatchHeader(
   }
 
   const isLive = Boolean(match.isLive);
+  const showMatchNumber =
+    options.showMatchNumber !== false &&
+    resolvedMatchNumber !== undefined &&
+    resolvedMatchNumber !== '';
   const showStartTime =
     options.showStartTime !== false && match.startTime !== undefined && match.startTime !== '';
   const showVenue =
     options.showVenue !== false &&
     match.venue !== undefined &&
     (typeof match.venue === 'string' ? match.venue !== '' : match.venue.name !== '');
-  const hasLeftInfo = Boolean(match.label || showVenue);
+  const hasLeftInfo = Boolean(showMatchNumber || match.label || showVenue);
 
   if (!isLive && !hasLeftInfo && !showStartTime) {
     return null;
@@ -476,9 +540,19 @@ function createMatchHeader(
   const headerEl = document.createElement('div');
   headerEl.className = 'ml-match-header';
 
-  // 左側: 会場・コート名 / ラベル
+  // 左側: 通し試合番号 / 会場・コート名 / ラベル
   const leftEl = document.createElement('div');
   leftEl.className = 'ml-match-header-left';
+
+  if (showMatchNumber && resolvedMatchNumber !== undefined) {
+    const numEl = document.createElement('span');
+    numEl.className = 'ml-match-number';
+    numEl.textContent =
+      typeof options.formatMatchNumber === 'function'
+        ? options.formatMatchNumber(resolvedMatchNumber, match)
+        : defaultFormatMatchNumber(resolvedMatchNumber);
+    leftEl.appendChild(numEl);
+  }
 
   if (showVenue && match.venue !== undefined) {
     const venueText =
@@ -569,6 +643,9 @@ function createMatchHeader(
 function createMatchCard(
   match: Match,
   matchKey: string,
+  resolvedMatchNumber: number | string | undefined,
+  normalizedRounds: Match[][],
+  matchNumberMap: Map<string, number | string>,
   contestants: Record<string, Contestant> | undefined,
   isBronzeMatch: boolean,
   options: BracketOptions,
@@ -631,8 +708,8 @@ function createMatchCard(
     card.setAttribute('tabindex', '0');
   }
 
-  // 試合ヘッダー（会場・ラベル・開始時間・LIVEバッジ）
-  const headerEl = createMatchHeader(match, isBronzeMatch, options);
+  // 試合ヘッダー（試合番号・会場・ラベル・開始時間・LIVEバッジ）
+  const headerEl = createMatchHeader(match, resolvedMatchNumber, isBronzeMatch, options);
   if (headerEl) {
     card.appendChild(headerEl);
   }
@@ -643,11 +720,48 @@ function createMatchCard(
   const topSide = match.sides?.[0] ?? null;
   const bottomSide = match.sides?.[1] ?? null;
 
+  const topPlaceholder = resolveSourcePlaceholder(
+    normalizedRounds,
+    matchNumberMap,
+    match,
+    0,
+    isBronzeMatch,
+    options,
+  );
+  const bottomPlaceholder = resolveSourcePlaceholder(
+    normalizedRounds,
+    matchNumberMap,
+    match,
+    1,
+    isBronzeMatch,
+    options,
+  );
+
   bodyEl.appendChild(
-    createSideRow(topSide, contestants, match, 0, isBronzeMatch, options, tbdLabel, byeLabel),
+    createSideRow(
+      topSide,
+      contestants,
+      match,
+      0,
+      isBronzeMatch,
+      options,
+      tbdLabel,
+      byeLabel,
+      topPlaceholder,
+    ),
   );
   bodyEl.appendChild(
-    createSideRow(bottomSide, contestants, match, 1, isBronzeMatch, options, tbdLabel, byeLabel),
+    createSideRow(
+      bottomSide,
+      contestants,
+      match,
+      1,
+      isBronzeMatch,
+      options,
+      tbdLabel,
+      byeLabel,
+      bottomPlaceholder,
+    ),
   );
   card.appendChild(bodyEl);
 
@@ -751,6 +865,29 @@ export function renderBracketDOM(
 
   const { normalizedRounds, bronzeMatch } = normalizeBracketMatches(data);
 
+  // 全試合の通し試合番号マップを構築（match.matchNumber 優先、autoMatchNumbers: true 時は自動採番）
+  const matchNumberMap = new Map<string, number | string>();
+  let autoSeq = 1;
+  for (const roundMatches of normalizedRounds) {
+    for (const m of roundMatches) {
+      const key = getMatchKey(m);
+      if (m.matchNumber !== undefined) {
+        matchNumberMap.set(key, m.matchNumber);
+      } else if (options.autoMatchNumbers) {
+        matchNumberMap.set(key, autoSeq);
+      }
+      autoSeq++;
+    }
+  }
+  if (bronzeMatch) {
+    const bKey = getMatchKey(bronzeMatch);
+    if (bronzeMatch.matchNumber !== undefined) {
+      matchNumberMap.set(bKey, bronzeMatch.matchNumber);
+    } else if (options.autoMatchNumbers) {
+      matchNumberMap.set(bKey, autoSeq);
+    }
+  }
+
   // 背面SVGレイヤー（接続線用）
   const svgElement = document.createElementNS(SVG_NS, 'svg');
   svgElement.setAttribute('class', 'ml-connectors');
@@ -807,6 +944,9 @@ export function renderBracketDOM(
       const { outerEl, cardEl } = createMatchCard(
         match,
         matchKey,
+        matchNumberMap.get(matchKey),
+        normalizedRounds,
+        matchNumberMap,
         data.contestants,
         false,
         options,
@@ -847,6 +987,9 @@ export function renderBracketDOM(
       const { outerEl, cardEl } = createMatchCard(
         bronzeMatch,
         bronzeKey,
+        matchNumberMap.get(bronzeKey),
+        normalizedRounds,
+        matchNumberMap,
         data.contestants,
         true,
         options,

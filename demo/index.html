@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>matchline — デモページ</title>
+  </head>
+  <body>
+    <div class="demo-page">
+      <header class="demo-header">
+        <div>
+          <h1>matchline デモ</h1>
+          <p class="demo-subtitle">
+            依存ゼロ・Vanilla TypeScript製 トーナメント表描画ライブラリ（8チーム・シングルエリミネーション）
+          </p>
+        </div>
+        <div class="demo-controls">
+          <label class="demo-control">
+            <span>テーマ</span>
+            <select id="theme-select">
+              <option value="light">ライト（デフォルト）</option>
+              <option value="dark">ダーク</option>
+              <option value="emerald">エメラルド</option>
+            </select>
+          </label>
+          <label class="demo-control">
+            <span>接続線</span>
+            <select id="connector-select">
+              <option value="orthogonal">直角（orthogonal）</option>
+              <option value="curved">曲線（curved）</option>
+            </select>
+          </label>
+          <button id="toggle-final-btn" type="button">決勝スコアを切り替え</button>
+        </div>
+      </header>
+
+      <main class="demo-stage" id="bracket-stage">
+        <div id="bracket-root"></div>
+      </main>
+
+      <section class="demo-log" aria-live="polite">
+        <h2>クリックイベントログ</h2>
+        <p id="click-log">試合カードをクリックすると、ここに試合情報が表示されます。</p>
+      </section>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

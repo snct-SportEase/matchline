@@ -1,0 +1,50 @@
+{
+  "name": "matchline",
+  "version": "0.1.0",
+  "description": "Zero-dependency Vanilla TypeScript tournament bracket renderer",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite demo",
+    "demo:build": "vite build demo"
+  },
+  "keywords": [
+    "tournament",
+    "bracket",
+    "single-elimination",
+    "typescript",
+    "zero-dependency",
+    "svg"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.0",
+    "vite": "^6.2.0"
+  }
+}

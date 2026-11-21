@@ -1,0 +1,241 @@
+/* ==========================================================================
+   matchline デフォルトスタイルシート
+   CSSカスタムプロパティを上書きすることで簡単にテーマ変更が可能です
+   ========================================================================== */
+
+.ml-container {
+  /* タイポグラフィ・背景 */
+  --ml-font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ml-bg: transparent;
+  --ml-padding: 16px;
+
+  /* レイアウト間隔 */
+  --ml-round-gap: 48px;
+  --ml-match-gap: 16px;
+
+  /* 試合カード */
+  --ml-card-width: 210px;
+  --ml-card-bg: #ffffff;
+  --ml-card-border: #d8dee4;
+  --ml-card-border-hover: #0969da;
+  --ml-card-radius: 8px;
+  --ml-card-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --ml-card-shadow-hover: 0 4px 12px rgba(9, 105, 218, 0.14);
+
+  /* テキスト・区切り線 */
+  --ml-text-color: #1f2328;
+  --ml-text-muted: #6e7781;
+  --ml-seed-color: #6e7781;
+  --ml-divider-color: #eaeef2;
+
+  /* スコア */
+  --ml-score-bg: #f6f8fa;
+  --ml-score-color: #1f2328;
+
+  /* 勝者ハイライト */
+  --ml-winner-bg: #f0f7ff;
+  --ml-winner-color: #0969da;
+  --ml-winner-score-bg: #0969da;
+  --ml-winner-score-color: #ffffff;
+
+  /* ラウンド見出し */
+  --ml-header-color: #57606a;
+  --ml-header-bg: transparent;
+  --ml-header-margin-bottom: 16px;
+
+  /* SVG接続線（コネクタ） */
+  --ml-line-color: #cbd5e1;
+  --ml-line-active-color: #0969da;
+  --ml-line-width: 2px;
+
+  font-family: var(--ml-font-family);
+  background: var(--ml-bg);
+  color: var(--ml-text-color);
+  overflow-x: auto;
+  box-sizing: border-box;
+}
+
+.ml-container *,
+.ml-container *::before,
+.ml-container *::after {
+  box-sizing: border-box;
+}
+
+/* SVGの座標基準となる内側ルート */
+.ml-root {
+  position: relative;
+  display: inline-block;
+  min-width: 100%;
+  width: max-content;
+  padding: var(--ml-padding);
+}
+
+/* 背面SVG接続線レイヤー */
+.ml-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 0;
+}
+
+.ml-connector {
+  fill: none;
+  stroke: var(--ml-line-color);
+  stroke-width: var(--ml-line-width);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.15s ease;
+}
+
+.ml-connector--winner {
+  stroke: var(--ml-line-active-color);
+}
+
+/* ラウンド列コンテナ */
+.ml-rounds {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: var(--ml-round-gap);
+}
+
+/* 各ラウンド列 */
+.ml-round {
+  display: flex;
+  flex-direction: column;
+  width: var(--ml-card-width);
+  flex-shrink: 0;
+}
+
+/* ラウンド見出し */
+.ml-round-header {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--ml-header-color);
+  background: var(--ml-header-bg);
+  text-align: center;
+  padding: 6px 8px;
+  margin-bottom: var(--ml-header-margin-bottom);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ラウンド内の試合カード群 */
+.ml-matches {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ml-match-gap);
+}
+
+/* 次ラウンドのカードを前ラウンド2試合の中央へ正確に揃えるラッパー */
+.ml-match-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* 試合カード */
+.ml-match {
+  width: 100%;
+  background: var(--ml-card-bg);
+  border: 1px solid var(--ml-card-border);
+  border-radius: var(--ml-card-radius);
+  box-shadow: var(--ml-card-shadow);
+  overflow: hidden;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.ml-match--clickable {
+  cursor: pointer;
+}
+
+.ml-match--clickable:hover {
+  border-color: var(--ml-card-border-hover);
+  box-shadow: var(--ml-card-shadow-hover);
+}
+
+.ml-match--clickable:focus-visible {
+  outline: 2px solid var(--ml-card-border-hover);
+  outline-offset: 2px;
+}
+
+/* チームスロット行 */
+.ml-team {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 0 0 10px;
+  font-size: 0.875rem;
+  line-height: 1.25;
+}
+
+.ml-team + .ml-team {
+  border-top: 1px solid var(--ml-divider-color);
+}
+
+.ml-team--winner {
+  background: var(--ml-winner-bg);
+  color: var(--ml-winner-color);
+  font-weight: 600;
+}
+
+.ml-team--tbd,
+.ml-team--bye {
+  color: var(--ml-text-muted);
+  font-style: italic;
+}
+
+/* シード番号 */
+.ml-team-seed {
+  flex-shrink: 0;
+  min-width: 18px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ml-seed-color);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* チーム名（長い場合は省略記号で切り詰め） */
+.ml-team-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 8px;
+}
+
+/* スコア表示 */
+.ml-team-score {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  align-self: stretch;
+  padding: 0 8px;
+  background: var(--ml-score-bg);
+  color: var(--ml-score-color);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-left: 1px solid var(--ml-divider-color);
+}
+
+.ml-team--winner .ml-team-score {
+  background: var(--ml-winner-score-bg);
+  color: var(--ml-winner-score-color);
+  border-left-color: transparent;
+}

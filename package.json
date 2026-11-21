@@ -1,6 +1,6 @@
 {
   "name": "@snct-sportease/matchline",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Zero-dependency Vanilla TypeScript tournament bracket renderer",
   "repository": {
     "type": "git",
@@ -11,7 +11,8 @@
     "url": "https://github.com/snct-SportEase/matchline/issues"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "type": "module",
   "main": "./dist/index.cjs",

@@ -5,6 +5,12 @@ export {
   type SeedContestantInput,
 } from './generator';
 export { recordMatchResult, type RecordMatchResultInput } from './progression';
+export {
+  validateBracketData,
+  type BracketValidationIssue,
+  type BracketValidationResult,
+  type ValidationErrorCode,
+} from './validation';
 export type {
   BracketData,
   BracketInstance,

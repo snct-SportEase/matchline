@@ -128,6 +128,21 @@ bracket.uninstall(); // または bracket.destroy()
 
 ## 大会運営向けユーティリティ・強調表示
 
+### データ検証（`validateBracketData`）
+
+トーナメント生成プレビューや保存前検証に利用できるバリデーションAPIです。例外を投げず、`{ valid, errors, warnings }` を返します。
+
+```ts
+import { validateBracketData } from '@snct-sportease/matchline';
+
+const result = validateBracketData(data);
+if (!result.valid) {
+  console.warn(result.errors);
+}
+```
+
+主な検査項目: `roundIndex` 範囲外、`order` 重複・不正値、試合ID重複、3位決定戦重複、未登録の `contestantId`、1試合3チーム以上、複数勝者指定、次ラウンドとの接続不整合（`nextMatchId` / 標準 `order` 上限）、および勝者進出先の不一致（warning）。
+
 ### 勝敗確定＆自動進出（`recordMatchResult`）
 
 ```ts

@@ -95,10 +95,12 @@ export function drawConnectors(
   matchElements: Map<string, HTMLElement>,
   connectorType: ConnectorType = 'orthogonal',
   highlightedContestantKey: string | null = null,
+  zoomScale = 1,
 ): void {
+  const safeScale = zoomScale > 0 ? zoomScale : 1;
   const rootRect = rootEl.getBoundingClientRect();
-  const width = Math.max(rootEl.scrollWidth, Math.ceil(rootRect.width));
-  const height = Math.max(rootEl.scrollHeight, Math.ceil(rootRect.height));
+  const width = Math.max(rootEl.scrollWidth, rootEl.offsetWidth, Math.ceil(rootRect.width / safeScale));
+  const height = Math.max(rootEl.scrollHeight, rootEl.offsetHeight, Math.ceil(rootRect.height / safeScale));
 
   if (width === 0 || height === 0) {
     svgEl.replaceChildren();
@@ -138,10 +140,11 @@ export function drawConnectors(
         continue;
       }
 
-      const x1 = fromRect.right - rootRect.left;
-      const y1 = fromRect.top + fromRect.height / 2 - rootRect.top;
-      const x2 = toRect.left - rootRect.left;
-      const y2 = toRect.top + toRect.height / 2 - rootRect.top;
+      // スケール適用時でも rootEl 内部のローカル座標へ正確に正規化する
+      const x1 = (fromRect.right - rootRect.left) / safeScale;
+      const y1 = (fromRect.top + fromRect.height / 2 - rootRect.top) / safeScale;
+      const x2 = (toRect.left - rootRect.left) / safeScale;
+      const y2 = (toRect.top + toRect.height / 2 - rootRect.top) / safeScale;
 
       const isWinner = (match.sides ?? []).some((side) => Boolean(side.isWinner));
       const isHighlighted = isConnectorHighlightedForContestant(

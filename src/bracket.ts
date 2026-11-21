@@ -161,13 +161,24 @@ export function createBracket(
   let currentOptions: BracketOptions = { ...options };
   let baseRoundIndex = Math.max(0, options.initialBaseRoundIndex ?? 0);
   let autoVisibleRoundsCount: number | null = null;
+  let currentZoom = options.initialZoom ?? 1;
   let highlightState: HighlightState = { type: 'none' };
   let appliedCustomStyleKeys: string[] = [];
   let renderResult: RenderResult | null = null;
   let rafId: number | null = null;
   let isDestroyed = false;
 
-  // 全体ラッパー > 上段ナビバー + ボディ領域（左右ナビボタン / ビューポート / 上下スクロールボタン）
+  // ドラッグパン・ピンチズーム用の状態
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panStartScrollLeft = 0;
+  let panStartScrollTop = 0;
+  let suppressNextClick = false;
+  let pinchStartDist: number | null = null;
+  let pinchStartZoom = 1;
+
+  // 全体ラッパー > 上段ナビバー + ボディ領域（左右ナビボタン / ビューポート / ズーム・スクロールUI）
   const containerEl = document.createElement('div');
   containerEl.className = 'ml-container';
 
@@ -204,18 +215,50 @@ export function createBracket(
   scrollDownBtn.dataset.scrollAction = 'down';
   scrollDownBtn.setAttribute('aria-label', '下へスクロール');
 
+  // ズームコントロールUI（右下フローティング）
+  const zoomControlsEl = document.createElement('div');
+  zoomControlsEl.className = 'ml-zoom-controls';
+  zoomControlsEl.setAttribute('aria-label', 'ズーム操作');
+
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.type = 'button';
+  zoomOutBtn.className = 'ml-zoom-btn';
+  zoomOutBtn.setAttribute('aria-label', '縮小');
+  zoomOutBtn.textContent = '−';
+
+  const zoomResetBtn = document.createElement('button');
+  zoomResetBtn.type = 'button';
+  zoomResetBtn.className = 'ml-zoom-btn ml-zoom-btn--label';
+  zoomResetBtn.setAttribute('aria-label', '倍率をリセット');
+  zoomResetBtn.textContent = '100%';
+
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.type = 'button';
+  zoomInBtn.className = 'ml-zoom-btn';
+  zoomInBtn.setAttribute('aria-label', '拡大');
+  zoomInBtn.textContent = '＋';
+
+  zoomControlsEl.appendChild(zoomOutBtn);
+  zoomControlsEl.appendChild(zoomResetBtn);
+  zoomControlsEl.appendChild(zoomInBtn);
+
   const viewportEl = document.createElement('div');
   viewportEl.className = 'ml-viewport';
+
+  const zoomSizerEl = document.createElement('div');
+  zoomSizerEl.className = 'ml-zoom-sizer';
 
   const rootEl = document.createElement('div');
   rootEl.className = 'ml-root';
 
-  viewportEl.appendChild(rootEl);
+  zoomSizerEl.appendChild(rootEl);
+  viewportEl.appendChild(zoomSizerEl);
   bodyWrapEl.appendChild(sidePrevBtn);
   bodyWrapEl.appendChild(viewportEl);
   bodyWrapEl.appendChild(sideNextBtn);
   bodyWrapEl.appendChild(scrollUpBtn);
   bodyWrapEl.appendChild(scrollDownBtn);
+  bodyWrapEl.appendChild(zoomControlsEl);
 
   containerEl.appendChild(navEl);
   containerEl.appendChild(bodyWrapEl);
@@ -286,6 +329,41 @@ export function createBracket(
       currentOptions.scrollButtonsPosition ??
       (scrollMode === 'native' ? 'hidden' : 'overMatches');
     containerEl.dataset.scrollPosition = scrollPos;
+
+    // パン・ズーム状態反映
+    viewportEl.classList.toggle('ml-viewport--pannable', Boolean(currentOptions.enablePan));
+    const showZoomUI =
+      currentOptions.showZoomControls !== undefined
+        ? currentOptions.showZoomControls
+        : Boolean(currentOptions.enableZoom);
+    zoomControlsEl.hidden = !showZoomUI;
+  };
+
+  /**
+   * ズーム倍率をクランプしてDOM（transform + sizer）およびボタン状態へ反映する
+   */
+  const applyZoomToDOM = (): void => {
+    const minZ = currentOptions.minZoom ?? 0.4;
+    const maxZ = currentOptions.maxZoom ?? 1.8;
+    currentZoom = Math.min(maxZ, Math.max(minZ, Math.round(currentZoom * 100) / 100));
+
+    if (currentZoom === 1) {
+      rootEl.style.transform = '';
+      zoomSizerEl.style.width = '';
+      zoomSizerEl.style.height = '';
+    } else {
+      rootEl.style.transform = `scale(${currentZoom})`;
+      const baseW = rootEl.offsetWidth;
+      const baseH = rootEl.offsetHeight;
+      if (baseW > 0 && baseH > 0) {
+        zoomSizerEl.style.width = `${Math.ceil(baseW * currentZoom)}px`;
+        zoomSizerEl.style.height = `${Math.ceil(baseH * currentZoom)}px`;
+      }
+    }
+
+    zoomResetBtn.textContent = `${Math.round(currentZoom * 100)}%`;
+    zoomOutBtn.disabled = currentZoom <= minZ + 0.001;
+    zoomInBtn.disabled = currentZoom >= maxZ - 0.001;
   };
 
   /**
@@ -408,6 +486,7 @@ export function createBracket(
     if (isDestroyed || !renderResult) {
       return;
     }
+    applyZoomToDOM();
     const contestantKey =
       highlightState.type === 'contestant' && isHighlightEnabled()
         ? highlightState.key
@@ -419,6 +498,7 @@ export function createBracket(
       renderResult.matchElements,
       currentOptions.connectorType ?? 'orthogonal',
       contestantKey,
+      currentZoom,
     );
     updateScrollButtonsState();
   };
@@ -633,6 +713,10 @@ export function createBracket(
   };
 
   const handleRootClick = (event: MouseEvent): void => {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      return;
+    }
     handleInteraction(event.target, event);
   };
 
@@ -739,6 +823,94 @@ export function createBracket(
   const handleScrollDownClick = (): void => handleScrollBtnClick('down');
   const handleViewportScroll = (): void => updateScrollButtonsState();
 
+  // ズーム操作ハンドラ
+  const setZoomImpl = (scale: number): void => {
+    if (isDestroyed) return;
+    currentZoom = scale;
+    redrawConnectors();
+  };
+
+  const handleZoomOutClick = (): void => {
+    setZoomImpl(currentZoom - (currentOptions.zoomStep ?? 0.15));
+  };
+  const handleZoomInClick = (): void => {
+    setZoomImpl(currentZoom + (currentOptions.zoomStep ?? 0.15));
+  };
+  const handleZoomResetClick = (): void => {
+    setZoomImpl(1);
+  };
+
+  // Ctrl / Meta + ホイールによるズーム（PC向け）
+  const handleWheel = (event: WheelEvent): void => {
+    if (isDestroyed || !currentOptions.enableZoom) return;
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    const step = currentOptions.zoomStep ?? 0.15;
+    setZoomImpl(currentZoom + (event.deltaY < 0 ? step : -step));
+  };
+
+  // 2本指ピンチズーム（スマホ・タブレット向け）
+  const getTouchDistance = (touches: TouchList): number => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  };
+
+  const handleTouchStart = (event: TouchEvent): void => {
+    if (isDestroyed || !currentOptions.enableZoom) return;
+    if (event.touches.length === 2) {
+      pinchStartDist = getTouchDistance(event.touches);
+      pinchStartZoom = currentZoom;
+    }
+  };
+
+  const handleTouchMove = (event: TouchEvent): void => {
+    if (isDestroyed || !currentOptions.enableZoom || pinchStartDist === null) return;
+    if (event.touches.length === 2) {
+      event.preventDefault();
+      const dist = getTouchDistance(event.touches);
+      if (pinchStartDist > 0) {
+        setZoomImpl(pinchStartZoom * (dist / pinchStartDist));
+      }
+    }
+  };
+
+  const handleTouchEnd = (event: TouchEvent): void => {
+    if (event.touches.length < 2) {
+      pinchStartDist = null;
+    }
+  };
+
+  // マウスドラッグによるパン移動
+  const handlePanPointerDown = (event: PointerEvent): void => {
+    if (isDestroyed || !currentOptions.enablePan) return;
+    if (event.pointerType !== 'mouse' || event.button !== 0) return;
+    isPanning = true;
+    suppressNextClick = false;
+    panStartX = event.clientX;
+    panStartY = event.clientY;
+    panStartScrollLeft = viewportEl.scrollLeft;
+    panStartScrollTop = viewportEl.scrollTop;
+    viewportEl.classList.add('ml-viewport--panning');
+  };
+
+  const handlePanPointerMove = (event: PointerEvent): void => {
+    if (!isPanning) return;
+    const dx = event.clientX - panStartX;
+    const dy = event.clientY - panStartY;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      suppressNextClick = true;
+    }
+    viewportEl.scrollLeft = panStartScrollLeft - dx;
+    viewportEl.scrollTop = panStartScrollTop - dy;
+  };
+
+  const handlePanPointerUp = (): void => {
+    if (!isPanning) return;
+    isPanning = false;
+    viewportEl.classList.remove('ml-viewport--panning');
+  };
+
   rootEl.addEventListener('click', handleRootClick);
   rootEl.addEventListener('keydown', handleRootKeyDown);
   rootEl.addEventListener('pointerover', handlePointerOver);
@@ -748,7 +920,17 @@ export function createBracket(
   sideNextBtn.addEventListener('click', handleNavActionClick);
   scrollUpBtn.addEventListener('click', handleScrollUpClick);
   scrollDownBtn.addEventListener('click', handleScrollDownClick);
+  zoomOutBtn.addEventListener('click', handleZoomOutClick);
+  zoomResetBtn.addEventListener('click', handleZoomResetClick);
+  zoomInBtn.addEventListener('click', handleZoomInClick);
   viewportEl.addEventListener('scroll', handleViewportScroll, { passive: true });
+  viewportEl.addEventListener('wheel', handleWheel, { passive: false });
+  viewportEl.addEventListener('touchstart', handleTouchStart, { passive: true });
+  viewportEl.addEventListener('touchmove', handleTouchMove, { passive: false });
+  viewportEl.addEventListener('touchend', handleTouchEnd, { passive: true });
+  viewportEl.addEventListener('pointerdown', handlePanPointerDown);
+  window.addEventListener('pointermove', handlePanPointerMove);
+  window.addEventListener('pointerup', handlePanPointerUp);
 
   // リサイズ時にSVG接続線と 'auto' 表示ラウンド数を自動追従させる ResizeObserver
   let resizeObserver: ResizeObserver | null = null;
@@ -838,7 +1020,17 @@ export function createBracket(
     sideNextBtn.removeEventListener('click', handleNavActionClick);
     scrollUpBtn.removeEventListener('click', handleScrollUpClick);
     scrollDownBtn.removeEventListener('click', handleScrollDownClick);
+    zoomOutBtn.removeEventListener('click', handleZoomOutClick);
+    zoomResetBtn.removeEventListener('click', handleZoomResetClick);
+    zoomInBtn.removeEventListener('click', handleZoomInClick);
     viewportEl.removeEventListener('scroll', handleViewportScroll);
+    viewportEl.removeEventListener('wheel', handleWheel);
+    viewportEl.removeEventListener('touchstart', handleTouchStart);
+    viewportEl.removeEventListener('touchmove', handleTouchMove);
+    viewportEl.removeEventListener('touchend', handleTouchEnd);
+    viewportEl.removeEventListener('pointerdown', handlePanPointerDown);
+    window.removeEventListener('pointermove', handlePanPointerMove);
+    window.removeEventListener('pointerup', handlePanPointerUp);
 
     containerEl.remove();
     renderResult = null;
@@ -957,6 +1149,26 @@ export function createBracket(
 
     getNavigationState(): NavigationState {
       return computeNavigationState();
+    },
+
+    setZoom(scale: number): void {
+      setZoomImpl(scale);
+    },
+
+    zoomIn(): void {
+      setZoomImpl(currentZoom + (currentOptions.zoomStep ?? 0.15));
+    },
+
+    zoomOut(): void {
+      setZoomImpl(currentZoom - (currentOptions.zoomStep ?? 0.15));
+    },
+
+    resetZoom(): void {
+      setZoomImpl(1);
+    },
+
+    getZoom(): number {
+      return currentZoom;
     },
 
     redrawConnectors(): void {

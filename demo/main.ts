@@ -331,13 +331,15 @@ if (!container) {
 let currentData: BracketData = createInitialData();
 let liveStep = 0;
 
-// テーマ・接続線・パス強調・通し試合番号はコード側オプションで事前指定する
+// テーマ・接続線・パス強調・通し試合番号・ズーム/パンはコード側オプションで事前指定する
 const bracket = createBracket(currentData, container, {
   theme: 'light', // 'light' | 'dark' | 'emerald' または CSS変数マップ
   connectorType: 'orthogonal', // 'orthogonal' | 'curved'
   highlightContestantHistory: true,
   highlightTrigger: 'click', // 'click' | 'hover'
   autoMatchNumbers: true, // 通し試合番号（#1〜）と未定枠の「#Xの勝者」表示を有効化
+  enableZoom: true, // ピンチズーム・Ctrl+ホイール・右下ズームUIを有効化
+  enablePan: true, // PCマウスドラッグでのパン移動を有効化
   showNavigation: true,
 });
 

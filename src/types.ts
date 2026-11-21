@@ -334,6 +334,22 @@ export interface BracketOptions {
   /** 下スクロールボタンのカスタムHTML */
   scrollDownButtonHTML?: string;
 
+  // --- スマホ・大規模閲覧向けズーム＆ドラッグパン ---
+  /** ズーム操作（ピンチズーム・Ctrl+ホイール・ズームボタン）を有効にするか（デフォルト: false） */
+  enableZoom?: boolean;
+  /** マウスドラッグによるパン移動を有効にするか（タッチ端末はネイティブ慣性スクロールを使用。デフォルト: false） */
+  enablePan?: boolean;
+  /** 初期ズーム倍率（デフォルト: 1） */
+  initialZoom?: number;
+  /** 最小ズーム倍率（デフォルト: 0.4） */
+  minZoom?: number;
+  /** 最大ズーム倍率（デフォルト: 1.8） */
+  maxZoom?: number;
+  /** zoomIn / zoomOut の1ステップあたりの倍率増減（デフォルト: 0.15） */
+  zoomStep?: number;
+  /** 右下にズーム操作コントロール（− / 100% / ＋）を表示するか（デフォルト: enableZoom と同じ） */
+  showZoomControls?: boolean;
+
   // --- パーツ単位のカスタムHTML差し替えフック（Bracketry 互換） ---
   /** 国籍・国旗表示のカスタムHTMLフック */
   getNationalityHTML?: (player: Player, context: PlayerRenderContext) => CustomMarkupResult;
@@ -427,6 +443,16 @@ export interface BracketInstance {
   setBaseRoundIndex: (index: number) => void;
   /** 現在のナビゲーション状態を取得する */
   getNavigationState: () => NavigationState;
+  /** ズーム倍率を設定する（minZoom〜maxZoom の範囲に自動クランプ） */
+  setZoom: (scale: number) => void;
+  /** ズームイン（zoomStep 分拡大）する */
+  zoomIn: () => void;
+  /** ズームアウト（zoomStep 分縮小）する */
+  zoomOut: () => void;
+  /** ズーム倍率を 1.0 にリセットする */
+  resetZoom: () => void;
+  /** 現在のズーム倍率を取得する */
+  getZoom: () => number;
   /** SVG接続線の座標を再計算して再描画する */
   redrawConnectors: () => void;
   /** DOM要素・イベントリスナー・ResizeObserverを破棄してクリーンアップする */

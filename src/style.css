@@ -360,12 +360,83 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.ml-viewport--pannable {
+  cursor: grab;
+}
+
+.ml-viewport--panning {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* ズーム時のスクロール領域サイズを正確に保つラッパー */
+.ml-zoom-sizer {
+  position: relative;
+  min-width: 100%;
+  width: max-content;
+}
+
 .ml-root {
   position: relative;
   display: inline-block;
   min-width: 100%;
   width: max-content;
   padding: var(--ml-padding);
+  transform-origin: 0 0;
+}
+
+/* ズームコントロール（右下フローティング） */
+.ml-zoom-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--ml-nav-border);
+  border-radius: 8px;
+  background: var(--ml-nav-active-bg);
+  box-shadow: var(--ml-card-shadow-hover);
+  overflow: hidden;
+}
+
+.ml-zoom-controls[hidden] {
+  display: none;
+}
+
+.ml-zoom-btn {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--ml-nav-active-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.ml-zoom-btn + .ml-zoom-btn {
+  border-left: 1px solid var(--ml-nav-border);
+}
+
+.ml-zoom-btn--label {
+  min-width: 48px;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.ml-zoom-btn:hover:not(:disabled) {
+  background: var(--ml-nav-bg);
+}
+
+.ml-zoom-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* 背面SVG接続線レイヤー */
@@ -864,6 +935,36 @@
 }
 
 /* ==========================================================================
+   モバイル向けレスポンシブ最適化（スマホ閲覧）
+   ========================================================================== */
+@media (max-width: 640px) {
+  .ml-container {
+    --ml-card-width: 216px;
+    --ml-round-gap: 32px;
+    --ml-match-gap: 14px;
+    --ml-padding: 12px 12px 20px;
+  }
+
+  .ml-team {
+    min-height: 40px;
+  }
+
+  .ml-nav {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .ml-nav-pill {
+    padding: 6px 10px;
+  }
+
+  .ml-zoom-btn {
+    min-width: 34px;
+    height: 34px;
+  }
+}
+
+/* ==========================================================================
    印刷用スタイル（会場掲示・PDF出力対応）
    ========================================================================== */
 @media print {
@@ -877,7 +978,8 @@
 
   .ml-nav,
   .ml-side-nav-btn,
-  .ml-scroll-btn {
+  .ml-scroll-btn,
+  .ml-zoom-controls {
     display: none !important;
   }
 

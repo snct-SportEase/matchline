@@ -122,6 +122,7 @@ bracket.uninstall(); // または bracket.destroy()
 
 - **カスタムHTML差し替えフック**: `getNationalityHTML`, `getEntryStatusHTML`, `getPlayerTitleHTML`, `getMatchTopHTML`, `getMatchBottomHTML`, `getScoresHTML`, `getMatchElement`
 - **スクロール・ナビゲーション・レイアウト**: `verticalScrollMode` (`'native' | 'buttons' | 'mixed'`), `navButtonsPosition` (`'top' | 'gutters' | 'overTitles' | 'overMatches' | 'hidden'`), `scrollButtonsPosition`, `useClassicalLayout`, `resetScrollOnNavigation`, `visibleRoundsCount` (`number | 'auto'`), `leftNavButtonHTML` / `rightNavButtonHTML` / `scrollUpButtonHTML` / `scrollDownButtonHTML`
+- **スマホ閲覧・ズーム＆パン**: `enableZoom`, `enablePan`, `initialZoom`, `minZoom`, `maxZoom`, `zoomStep`, `showZoomControls`（メソッド: `setZoom`, `zoomIn`, `zoomOut`, `resetZoom`, `getZoom`）
 - **コールバック・状態**: `onMatchClick`, `onMatchSideClick` / `onSideClick`, `disableHighlight`, `getAllData()`, `getUserOptions()`
 - **JSスタイルオプション**: `rootBgColor`, `mainVerticalPadding`, `roundTitlesFontSize`, `roundTitlesFontColor`, `matchFontSize`, `matchTextColor`, `matchMinVerticalGap`, `matchMaxWidth`, `roundGap`, `distanceBetweenScorePairs`, `connectionLinesWidth`, `connectionLinesColor`, `highlightedConnectionLinesColor`, `highlightedPlayerTitleColor`, `liveMatchBorderColor`, `disableOpacity`
 

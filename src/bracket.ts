@@ -5,6 +5,7 @@ import {
   isBronze,
   renderBracketDOM,
   renderNavigationBar,
+  setButtonContent,
   type RenderResult,
 } from './renderer';
 import type {
@@ -50,6 +51,62 @@ function mergeMatchUpdate(match: Match, update: MatchUpdate): Match {
 }
 
 /**
+ * JSスタイルオプションから CSSカスタムプロパティへのマッピングを生成する
+ */
+function buildStyleVarOverrides(options: BracketOptions): Record<string, string> {
+  const vars: Record<string, string> = {};
+
+  if (options.rootBgColor !== undefined) vars['--ml-bg'] = options.rootBgColor;
+  if (options.mainVerticalPadding !== undefined) {
+    vars['--ml-padding'] = `${options.mainVerticalPadding}px 16px`;
+  }
+  if (options.roundTitlesFontSize !== undefined) {
+    vars['--ml-header-font-size'] = `${options.roundTitlesFontSize}px`;
+  }
+  if (options.roundTitlesFontColor !== undefined) {
+    vars['--ml-header-color'] = options.roundTitlesFontColor;
+  }
+  if (options.matchFontSize !== undefined) {
+    vars['--ml-font-size'] = `${options.matchFontSize}px`;
+  }
+  if (options.matchTextColor !== undefined) {
+    vars['--ml-text-color'] = options.matchTextColor;
+  }
+  if (options.matchMinVerticalGap !== undefined) {
+    vars['--ml-match-gap'] = `${options.matchMinVerticalGap}px`;
+  }
+  if (options.matchMaxWidth !== undefined) {
+    vars['--ml-card-width'] = `${options.matchMaxWidth}px`;
+  }
+  if (options.roundGap !== undefined) {
+    vars['--ml-round-gap'] = `${options.roundGap}px`;
+  }
+  if (options.distanceBetweenScorePairs !== undefined) {
+    vars['--ml-score-gap'] = `${options.distanceBetweenScorePairs}px`;
+  }
+  if (options.connectionLinesWidth !== undefined) {
+    vars['--ml-line-width'] = `${options.connectionLinesWidth}px`;
+  }
+  if (options.connectionLinesColor !== undefined) {
+    vars['--ml-line-color'] = options.connectionLinesColor;
+  }
+  if (options.highlightedConnectionLinesColor !== undefined) {
+    vars['--ml-line-highlight-color'] = options.highlightedConnectionLinesColor;
+  }
+  if (options.highlightedPlayerTitleColor !== undefined) {
+    vars['--ml-highlight-color'] = options.highlightedPlayerTitleColor;
+  }
+  if (options.liveMatchBorderColor !== undefined) {
+    vars['--ml-live-color'] = options.liveMatchBorderColor;
+  }
+  if (options.disableOpacity) {
+    vars['--ml-dim-opacity'] = '1';
+  }
+
+  return vars;
+}
+
+/**
  * 指定されたコンテナ要素内にトーナメント表（ブラケット）を描画する
  *
  * `createBracket(container, data, options)` と Bracketry 互換の
@@ -86,40 +143,49 @@ export function createBracket(
   let currentData: BracketData = initialData;
   let currentOptions: BracketOptions = { ...options };
   let baseRoundIndex = Math.max(0, options.initialBaseRoundIndex ?? 0);
+  let autoVisibleRoundsCount: number | null = null;
   let highlightedContestantKey: string | null = null;
-  let appliedCustomThemeKeys: string[] = [];
+  let appliedCustomStyleKeys: string[] = [];
   let renderResult: RenderResult | null = null;
   let rafId: number | null = null;
   let isDestroyed = false;
 
-  // 全体ラッパー > ナビゲーションバー + スクロールビューポート > SVG基準ルート
+  // 全体ラッパー > 上段ナビバー + ボディ領域（左右ナビボタン / ビューポート / 上下スクロールボタン）
   const containerEl = document.createElement('div');
   containerEl.className = 'ml-container';
-
-  /**
-   * options.theme をコンテナ要素へ反映する
-   */
-  const applyTheme = (): void => {
-    for (const key of appliedCustomThemeKeys) {
-      containerEl.style.removeProperty(key);
-    }
-    appliedCustomThemeKeys = [];
-
-    const theme = currentOptions.theme ?? 'light';
-    if (typeof theme === 'string') {
-      containerEl.dataset.theme = theme;
-    } else {
-      containerEl.dataset.theme = 'custom';
-      for (const [key, value] of Object.entries(theme)) {
-        containerEl.style.setProperty(key, value);
-        appliedCustomThemeKeys.push(key);
-      }
-    }
-  };
 
   const navEl = document.createElement('nav');
   navEl.className = 'ml-nav';
   navEl.setAttribute('aria-label', 'ラウンドナビゲーション');
+
+  const bodyWrapEl = document.createElement('div');
+  bodyWrapEl.className = 'ml-body-wrap';
+
+  // フローティング／ガター用 左右ナビボタン
+  const sidePrevBtn = document.createElement('button');
+  sidePrevBtn.type = 'button';
+  sidePrevBtn.className = 'ml-side-nav-btn ml-side-nav-btn--prev';
+  sidePrevBtn.dataset.navAction = 'prev';
+  sidePrevBtn.setAttribute('aria-label', '前のラウンドへ');
+
+  const sideNextBtn = document.createElement('button');
+  sideNextBtn.type = 'button';
+  sideNextBtn.className = 'ml-side-nav-btn ml-side-nav-btn--next';
+  sideNextBtn.dataset.navAction = 'next';
+  sideNextBtn.setAttribute('aria-label', '次のラウンドへ');
+
+  // 縦スクロールボタン（verticalScrollMode: 'buttons' | 'mixed' 用）
+  const scrollUpBtn = document.createElement('button');
+  scrollUpBtn.type = 'button';
+  scrollUpBtn.className = 'ml-scroll-btn ml-scroll-btn--up';
+  scrollUpBtn.dataset.scrollAction = 'up';
+  scrollUpBtn.setAttribute('aria-label', '上へスクロール');
+
+  const scrollDownBtn = document.createElement('button');
+  scrollDownBtn.type = 'button';
+  scrollDownBtn.className = 'ml-scroll-btn ml-scroll-btn--down';
+  scrollDownBtn.dataset.scrollAction = 'down';
+  scrollDownBtn.setAttribute('aria-label', '下へスクロール');
 
   const viewportEl = document.createElement('div');
   viewportEl.className = 'ml-viewport';
@@ -128,26 +194,114 @@ export function createBracket(
   rootEl.className = 'ml-root';
 
   viewportEl.appendChild(rootEl);
+  bodyWrapEl.appendChild(sidePrevBtn);
+  bodyWrapEl.appendChild(viewportEl);
+  bodyWrapEl.appendChild(sideNextBtn);
+  bodyWrapEl.appendChild(scrollUpBtn);
+  bodyWrapEl.appendChild(scrollDownBtn);
+
   containerEl.appendChild(navEl);
-  containerEl.appendChild(viewportEl);
+  containerEl.appendChild(bodyWrapEl);
   container.appendChild(containerEl);
+
+  /**
+   * ハイライト機能が有効かどうか
+   */
+  const isHighlightEnabled = (): boolean =>
+    currentOptions.disableHighlight !== true &&
+    currentOptions.highlightContestantHistory !== false;
+
+  /**
+   * 画面幅から 'auto' 時の表示可能ラウンド数を計算する
+   */
+  const computeAutoVisibleRounds = (): number => {
+    const totalRounds = Math.max(1, currentData.rounds.length);
+    const availableWidth = viewportEl.clientWidth || containerEl.clientWidth;
+    if (availableWidth <= 0) {
+      return totalRounds;
+    }
+    const cardWidth = currentOptions.matchMaxWidth ?? 244;
+    const gap = currentOptions.roundGap ?? 48;
+    const horizontalPadding = 32;
+    const count = Math.floor((availableWidth - horizontalPadding + gap) / (cardWidth + gap));
+    return Math.min(totalRounds, Math.max(1, count));
+  };
+
+  /**
+   * テーマおよび JS スタイルオプション・スクロールモードをコンテナへ適用する
+   */
+  const applyThemeAndStyles = (): void => {
+    for (const key of appliedCustomStyleKeys) {
+      containerEl.style.removeProperty(key);
+    }
+    appliedCustomStyleKeys = [];
+
+    const theme = currentOptions.theme ?? 'light';
+    if (typeof theme === 'string') {
+      containerEl.dataset.theme = theme;
+    } else {
+      containerEl.dataset.theme = 'custom';
+      for (const [key, value] of Object.entries(theme)) {
+        containerEl.style.setProperty(key, value);
+        appliedCustomStyleKeys.push(key);
+      }
+    }
+
+    // JSスタイルオプション（Bracketry 互換）を CSSカスタムプロパティへ適用
+    const styleVars = buildStyleVarOverrides(currentOptions);
+    for (const [key, value] of Object.entries(styleVars)) {
+      containerEl.style.setProperty(key, value);
+      appliedCustomStyleKeys.push(key);
+    }
+
+    // 縦スクロールモード反映
+    const scrollMode = currentOptions.verticalScrollMode ?? 'native';
+    containerEl.dataset.scrollMode = scrollMode;
+
+    // ナビ・スクロールボタン配置モード反映
+    const navPos =
+      currentOptions.showNavigation === false
+        ? 'hidden'
+        : (currentOptions.navButtonsPosition ?? 'top');
+    containerEl.dataset.navPosition = navPos;
+
+    const scrollPos =
+      currentOptions.scrollButtonsPosition ??
+      (scrollMode === 'native' ? 'hidden' : 'overMatches');
+    containerEl.dataset.scrollPosition = scrollPos;
+  };
+
+  /**
+   * 表示ラウンド数を制限するモードかどうか
+   */
+  const isRestrictVisibleRoundsMode = (): boolean =>
+    currentOptions.visibleRoundsCount === 'auto' ||
+    (typeof currentOptions.visibleRoundsCount === 'number' &&
+      currentOptions.visibleRoundsCount > 0);
 
   /**
    * 現在のラウンド数・オプションから正規化されたナビゲーション状態を算出する
    */
   const computeNavigationState = (): NavigationState => {
     const totalRounds = currentData.rounds.length;
-    const rawVisible = currentOptions.visibleRoundsCount;
-    const visibleRoundsCount =
-      typeof rawVisible === 'number' && rawVisible > 0
-        ? Math.min(rawVisible, Math.max(1, totalRounds))
-        : Math.max(1, totalRounds);
+    let visibleRoundsCount = Math.max(1, totalRounds);
+
+    if (currentOptions.visibleRoundsCount === 'auto') {
+      const computed = autoVisibleRoundsCount ?? computeAutoVisibleRounds();
+      autoVisibleRoundsCount = computed;
+      visibleRoundsCount = Math.min(computed, Math.max(1, totalRounds));
+    } else if (
+      typeof currentOptions.visibleRoundsCount === 'number' &&
+      currentOptions.visibleRoundsCount > 0
+    ) {
+      visibleRoundsCount = Math.min(currentOptions.visibleRoundsCount, Math.max(1, totalRounds));
+    }
 
     const maxBaseIndex = Math.max(0, totalRounds - visibleRoundsCount);
     const clampedBase = Math.min(Math.max(0, baseRoundIndex), maxBaseIndex);
     baseRoundIndex = clampedBase;
 
-    const restrictMode = typeof rawVisible === 'number' && rawVisible > 0;
+    const restrictMode = isRestrictVisibleRoundsMode();
     const effectiveMax = restrictMode ? maxBaseIndex : Math.max(0, totalRounds - 1);
 
     return {
@@ -160,6 +314,31 @@ export function createBracket(
   };
 
   /**
+   * 縦スクロールボタンの活性・非活性状態を更新する
+   */
+  const updateScrollButtonsState = (): void => {
+    const scrollMode = currentOptions.verticalScrollMode ?? 'native';
+    const scrollPos =
+      currentOptions.scrollButtonsPosition ??
+      (scrollMode === 'native' ? 'hidden' : 'overMatches');
+    const showScrollBtns = scrollMode !== 'native' && scrollPos !== 'hidden';
+
+    scrollUpBtn.hidden = !showScrollBtns;
+    scrollDownBtn.hidden = !showScrollBtns;
+
+    if (!showScrollBtns) {
+      return;
+    }
+
+    setButtonContent(scrollUpBtn, currentOptions.scrollUpButtonHTML, '▲');
+    setButtonContent(scrollDownBtn, currentOptions.scrollDownButtonHTML, '▼');
+
+    const maxScrollTop = Math.max(0, viewportEl.scrollHeight - viewportEl.clientHeight);
+    scrollUpBtn.disabled = viewportEl.scrollTop <= 1;
+    scrollDownBtn.disabled = maxScrollTop <= 1 || viewportEl.scrollTop >= maxScrollTop - 1;
+  };
+
+  /**
    * 現在の highlightedContestantKey をDOM要素へ反映する
    */
   const applyHighlightToDOM = (): void => {
@@ -167,24 +346,21 @@ export function createBracket(
       return;
     }
 
-    rootEl.classList.toggle('ml-has-highlight', highlightedContestantKey !== null);
+    const activeKey = isHighlightEnabled() ? highlightedContestantKey : null;
+    rootEl.classList.toggle('ml-has-highlight', activeKey !== null);
 
     const sideEls = rootEl.querySelectorAll<HTMLElement>('.ml-team');
     for (const sideEl of sideEls) {
-      const isMatch =
-        highlightedContestantKey !== null &&
-        sideEl.dataset.contestantKey === highlightedContestantKey;
+      const isMatch = activeKey !== null && sideEl.dataset.contestantKey === activeKey;
       sideEl.classList.toggle('ml-team--highlighted', isMatch);
     }
 
     for (const [matchKey, cardEl] of renderResult.matchElements.entries()) {
       const meta = renderResult.matchMetaMap.get(matchKey);
       const hasContestant =
-        highlightedContestantKey !== null &&
+        activeKey !== null &&
         Boolean(
-          (meta?.match.sides ?? []).some(
-            (side) => getContestantKey(side) === highlightedContestantKey,
-          ),
+          (meta?.match.sides ?? []).some((side) => getContestantKey(side) === activeKey),
         );
       cardEl.classList.toggle('ml-match--highlighted', hasContestant);
     }
@@ -203,8 +379,9 @@ export function createBracket(
       renderResult.normalizedRounds,
       renderResult.matchElements,
       currentOptions.connectorType ?? 'orthogonal',
-      highlightedContestantKey,
+      isHighlightEnabled() ? highlightedContestantKey : null,
     );
+    updateScrollButtonsState();
   };
 
   /**
@@ -227,13 +404,7 @@ export function createBracket(
    * 全ラウンド表示モード時、指定ラウンドへ滑らかに横スクロールする
    */
   const scrollToRoundIfNeeded = (roundIndex: number): void => {
-    if (!renderResult) {
-      return;
-    }
-    const restrictMode =
-      typeof currentOptions.visibleRoundsCount === 'number' &&
-      currentOptions.visibleRoundsCount > 0;
-    if (restrictMode) {
+    if (!renderResult || isRestrictVisibleRoundsMode()) {
       return;
     }
 
@@ -250,25 +421,57 @@ export function createBracket(
   };
 
   /**
-   * DOM全体を再構築してナビゲーション・ハイライト・接続線を描画する
+   * ナビゲーションUI（上段バーまたは左右ボタン）を更新する
+   */
+  const updateNavigationUI = (navState: NavigationState): void => {
+    const navPos =
+      currentOptions.showNavigation === false
+        ? 'hidden'
+        : (currentOptions.navButtonsPosition ?? 'top');
+    const hasMultipleRounds = currentData.rounds.length > 1;
+
+    const showTopNav = navPos === 'top' && hasMultipleRounds;
+    navEl.hidden = !showTopNav;
+    if (showTopNav) {
+      renderNavigationBar(navEl, currentData, navState, currentOptions);
+    } else {
+      navEl.replaceChildren();
+    }
+
+    const showSideNav =
+      (navPos === 'gutters' || navPos === 'overTitles' || navPos === 'overMatches') &&
+      hasMultipleRounds;
+    sidePrevBtn.hidden = !showSideNav;
+    sideNextBtn.hidden = !showSideNav;
+
+    if (showSideNav) {
+      setButtonContent(sidePrevBtn, currentOptions.leftNavButtonHTML, '‹');
+      setButtonContent(sideNextBtn, currentOptions.rightNavButtonHTML, '›');
+      sidePrevBtn.disabled = !navState.canGoPrevious;
+      sideNextBtn.disabled = !navState.canGoNext;
+    }
+  };
+
+  /**
+   * DOM全体を再構築してテーマ・ナビゲーション・ハイライト・接続線を描画する
    */
   const render = (): void => {
     if (isDestroyed) {
       return;
     }
 
-    applyTheme();
+    applyThemeAndStyles();
 
     const navState = computeNavigationState();
-    const showNav = currentOptions.showNavigation !== false && currentData.rounds.length > 1;
-    navEl.hidden = !showNav;
-    if (showNav) {
-      renderNavigationBar(navEl, currentData, navState);
-    } else {
-      navEl.replaceChildren();
-    }
+    updateNavigationUI(navState);
 
-    renderResult = renderBracketDOM(rootEl, currentData, currentOptions, navState);
+    renderResult = renderBracketDOM(
+      rootEl,
+      currentData,
+      currentOptions,
+      navState,
+      isRestrictVisibleRoundsMode(),
+    );
     applyHighlightToDOM();
     redrawConnectors();
     scheduleRedraw();
@@ -302,10 +505,7 @@ export function createBracket(
 
     // カード外をクリックした場合はハイライトを解除する
     if (!cardEl || !rootEl.contains(cardEl)) {
-      if (
-        currentOptions.highlightContestantHistory !== false &&
-        (currentOptions.highlightTrigger ?? 'click') === 'click'
-      ) {
+      if (isHighlightEnabled() && (currentOptions.highlightTrigger ?? 'click') === 'click') {
         setHighlight(null);
       }
       return;
@@ -341,23 +541,25 @@ export function createBracket(
           ? (currentData.contestants[side.contestantId] ?? null)
           : null;
 
-      if (
-        currentOptions.highlightContestantHistory !== false &&
-        (currentOptions.highlightTrigger ?? 'click') === 'click'
-      ) {
+      if (isHighlightEnabled() && (currentOptions.highlightTrigger ?? 'click') === 'click') {
         setHighlight(
           contestantKey && highlightedContestantKey === contestantKey ? null : contestantKey,
         );
       }
 
+      const sideClickCtx = {
+        ...matchContext,
+        match: meta.match,
+        sideIndex,
+        contestant,
+        contestantKey,
+      };
+
       if (side && typeof currentOptions.onSideClick === 'function') {
-        currentOptions.onSideClick(side, {
-          ...matchContext,
-          match: meta.match,
-          sideIndex,
-          contestant,
-          contestantKey,
-        });
+        currentOptions.onSideClick(side, sideClickCtx);
+      }
+      if (typeof currentOptions.onMatchSideClick === 'function') {
+        currentOptions.onMatchSideClick(meta.match, sideIndex, sideClickCtx);
       }
     }
 
@@ -382,11 +584,7 @@ export function createBracket(
   };
 
   const handlePointerOver = (event: PointerEvent): void => {
-    if (
-      isDestroyed ||
-      currentOptions.highlightContestantHistory === false ||
-      currentOptions.highlightTrigger !== 'hover'
-    ) {
+    if (isDestroyed || !isHighlightEnabled() || currentOptions.highlightTrigger !== 'hover') {
       return;
     }
     if (!(event.target instanceof Element)) {
@@ -399,11 +597,7 @@ export function createBracket(
   };
 
   const handlePointerLeave = (): void => {
-    if (
-      isDestroyed ||
-      currentOptions.highlightContestantHistory === false ||
-      currentOptions.highlightTrigger !== 'hover'
-    ) {
+    if (isDestroyed || !isHighlightEnabled() || currentOptions.highlightTrigger !== 'hover') {
       return;
     }
     setHighlight(null);
@@ -416,28 +610,30 @@ export function createBracket(
     if (isDestroyed || currentData.rounds.length === 0) {
       return;
     }
-    const restrictMode =
-      typeof currentOptions.visibleRoundsCount === 'number' &&
-      currentOptions.visibleRoundsCount > 0;
+
+    const restrictMode = isRestrictVisibleRoundsMode();
+    const currentNav = computeNavigationState();
     const maxIndex = restrictMode
-      ? Math.max(0, currentData.rounds.length - currentOptions.visibleRoundsCount!)
+      ? Math.max(0, currentData.rounds.length - currentNav.visibleRoundsCount)
       : Math.max(0, currentData.rounds.length - 1);
 
     const clamped = Math.min(Math.max(0, nextIndex), maxIndex);
     baseRoundIndex = clamped;
 
+    if (currentOptions.resetScrollOnNavigation) {
+      viewportEl.scrollTop = 0;
+    }
+
     if (restrictMode) {
       render();
     } else {
       const navState = computeNavigationState();
-      if (!navEl.hidden) {
-        renderNavigationBar(navEl, currentData, navState);
-      }
+      updateNavigationUI(navState);
       scrollToRoundIfNeeded(clamped);
     }
   };
 
-  const handleNavClick = (event: MouseEvent): void => {
+  const handleNavActionClick = (event: MouseEvent): void => {
     if (isDestroyed || !(event.target instanceof Element)) {
       return;
     }
@@ -465,16 +661,45 @@ export function createBracket(
     }
   };
 
+  const handleScrollBtnClick = (direction: 'up' | 'down'): void => {
+    if (isDestroyed) return;
+    const step = Math.max(160, Math.round(viewportEl.clientHeight * 0.65));
+    const delta = direction === 'up' ? -step : step;
+    if (typeof viewportEl.scrollBy === 'function') {
+      viewportEl.scrollBy({ top: delta, behavior: 'smooth' });
+    } else {
+      viewportEl.scrollTop += delta;
+    }
+  };
+
+  const handleScrollUpClick = (): void => handleScrollBtnClick('up');
+  const handleScrollDownClick = (): void => handleScrollBtnClick('down');
+  const handleViewportScroll = (): void => updateScrollButtonsState();
+
   rootEl.addEventListener('click', handleRootClick);
   rootEl.addEventListener('keydown', handleRootKeyDown);
   rootEl.addEventListener('pointerover', handlePointerOver);
   rootEl.addEventListener('pointerleave', handlePointerLeave);
-  navEl.addEventListener('click', handleNavClick);
+  navEl.addEventListener('click', handleNavActionClick);
+  sidePrevBtn.addEventListener('click', handleNavActionClick);
+  sideNextBtn.addEventListener('click', handleNavActionClick);
+  scrollUpBtn.addEventListener('click', handleScrollUpClick);
+  scrollDownBtn.addEventListener('click', handleScrollDownClick);
+  viewportEl.addEventListener('scroll', handleViewportScroll, { passive: true });
 
-  // リサイズ時にSVG接続線を自動追従させる ResizeObserver
+  // リサイズ時にSVG接続線と 'auto' 表示ラウンド数を自動追従させる ResizeObserver
   let resizeObserver: ResizeObserver | null = null;
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(() => {
+      if (isDestroyed) return;
+      if (currentOptions.visibleRoundsCount === 'auto') {
+        const nextCount = computeAutoVisibleRounds();
+        if (nextCount !== autoVisibleRoundsCount) {
+          autoVisibleRoundsCount = nextCount;
+          render();
+          return;
+        }
+      }
       scheduleRedraw();
     });
     resizeObserver.observe(rootEl);
@@ -491,6 +716,9 @@ export function createBracket(
     currentData = newData;
     if (newOptions) {
       currentOptions = { ...currentOptions, ...newOptions };
+      if (newOptions.visibleRoundsCount !== 'auto') {
+        autoVisibleRoundsCount = null;
+      }
     }
     render();
   };
@@ -542,7 +770,12 @@ export function createBracket(
     rootEl.removeEventListener('keydown', handleRootKeyDown);
     rootEl.removeEventListener('pointerover', handlePointerOver);
     rootEl.removeEventListener('pointerleave', handlePointerLeave);
-    navEl.removeEventListener('click', handleNavClick);
+    navEl.removeEventListener('click', handleNavActionClick);
+    sidePrevBtn.removeEventListener('click', handleNavActionClick);
+    sideNextBtn.removeEventListener('click', handleNavActionClick);
+    scrollUpBtn.removeEventListener('click', handleScrollUpClick);
+    scrollDownBtn.removeEventListener('click', handleScrollDownClick);
+    viewportEl.removeEventListener('scroll', handleViewportScroll);
 
     containerEl.remove();
     renderResult = null;
@@ -558,7 +791,16 @@ export function createBracket(
         return;
       }
       currentOptions = { ...currentOptions, ...newOptions };
+      if (newOptions.visibleRoundsCount !== 'auto') {
+        autoVisibleRoundsCount = null;
+      }
       render();
+    },
+    getAllData(): BracketData {
+      return currentData;
+    },
+    getUserOptions(): BracketOptions {
+      return { ...currentOptions };
     },
     updateMatches: updateMatchesImpl,
     applyMatchesUpdates: updateMatchesImpl,
@@ -599,11 +841,10 @@ export function createBracket(
         return false;
       }
 
-      const restrictMode =
-        typeof currentOptions.visibleRoundsCount === 'number' &&
-        currentOptions.visibleRoundsCount > 0;
+      const restrictMode = isRestrictVisibleRoundsMode();
       if (restrictMode && targetRoundIndex >= 0) {
-        const visibleEnd = baseRoundIndex + currentOptions.visibleRoundsCount! - 1;
+        const navState = computeNavigationState();
+        const visibleEnd = baseRoundIndex + navState.visibleRoundsCount - 1;
         if (targetRoundIndex < baseRoundIndex || targetRoundIndex > visibleEnd) {
           goToRound(targetRoundIndex);
         }
@@ -627,11 +868,10 @@ export function createBracket(
     },
 
     moveToLastRound(): void {
-      const restrictMode =
-        typeof currentOptions.visibleRoundsCount === 'number' &&
-        currentOptions.visibleRoundsCount > 0;
+      const restrictMode = isRestrictVisibleRoundsMode();
+      const navState = computeNavigationState();
       const target = restrictMode
-        ? Math.max(0, currentData.rounds.length - currentOptions.visibleRoundsCount!)
+        ? Math.max(0, currentData.rounds.length - navState.visibleRoundsCount)
         : Math.max(0, currentData.rounds.length - 1);
       goToRound(target);
     },

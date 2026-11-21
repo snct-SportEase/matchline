@@ -109,12 +109,21 @@ bracket.applyMatchesUpdates([
   },
 ]);
 
-// プログラムからの操作
+// プログラムからの操作（Bracketry 互換メソッド群）
+const currentData = bracket.getAllData();
+const currentOpts = bracket.getUserOptions();
 bracket.highlightContestantHistory('c1');
 bracket.focusContestant('c1');
 bracket.moveToNextRound();
 bracket.uninstall(); // または bracket.destroy()
 ```
+
+## Bracketry 互換オプション
+
+- **カスタムHTML差し替えフック**: `getNationalityHTML`, `getEntryStatusHTML`, `getPlayerTitleHTML`, `getMatchTopHTML`, `getMatchBottomHTML`, `getScoresHTML`, `getMatchElement`
+- **スクロール・ナビゲーション・レイアウト**: `verticalScrollMode` (`'native' | 'buttons' | 'mixed'`), `navButtonsPosition` (`'top' | 'gutters' | 'overTitles' | 'overMatches' | 'hidden'`), `scrollButtonsPosition`, `useClassicalLayout`, `resetScrollOnNavigation`, `visibleRoundsCount` (`number | 'auto'`), `leftNavButtonHTML` / `rightNavButtonHTML` / `scrollUpButtonHTML` / `scrollDownButtonHTML`
+- **コールバック・状態**: `onMatchClick`, `onMatchSideClick` / `onSideClick`, `disableHighlight`, `getAllData()`, `getUserOptions()`
+- **JSスタイルオプション**: `rootBgColor`, `mainVerticalPadding`, `roundTitlesFontSize`, `roundTitlesFontColor`, `matchFontSize`, `matchTextColor`, `matchMinVerticalGap`, `matchMaxWidth`, `roundGap`, `distanceBetweenScorePairs`, `connectionLinesWidth`, `connectionLinesColor`, `highlightedConnectionLinesColor`, `highlightedPlayerTitleColor`, `liveMatchBorderColor`, `disableOpacity`
 
 ## 大規模トーナメントの自動生成（`generateBracketData`）
 

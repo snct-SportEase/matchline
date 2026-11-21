@@ -469,7 +469,7 @@ teamSearchInput?.addEventListener('keydown', (e) => {
 visibleRoundsSelect?.addEventListener('change', () => {
   const val = visibleRoundsSelect.value;
   bracket.applyNewOptions({
-    visibleRoundsCount: val === 'all' ? undefined : Number(val),
+    visibleRoundsCount: val === 'all' ? undefined : val === 'auto' ? 'auto' : Number(val),
   });
 });
 

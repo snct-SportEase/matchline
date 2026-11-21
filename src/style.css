@@ -23,6 +23,7 @@
   --ml-card-shadow-hover: 0 4px 12px rgba(15, 23, 42, 0.08);
 
   /* テキスト・区切り線 */
+  --ml-font-size: 0.85rem;
   --ml-text-color: #0f172a;
   --ml-text-muted: #94a3b8;
   --ml-seed-color: #64748b;
@@ -32,6 +33,7 @@
   --ml-score-bg: transparent;
   --ml-score-color: #475569;
   --ml-score-divider: #f1f5f9;
+  --ml-score-gap: 0px;
 
   /* 勝者スタイル */
   --ml-winner-bg: transparent;
@@ -52,6 +54,7 @@
   --ml-serving-color: #22c55e;
 
   /* ラウンド見出し */
+  --ml-header-font-size: 0.75rem;
   --ml-header-color: #64748b;
   --ml-header-bg: var(--ml-card-bg);
   --ml-header-border: #e2e8f0;
@@ -210,11 +213,149 @@
 }
 
 /* ==========================================================================
+   ボディ領域・左右ナビボタン・縦スクロールボタン
+   ========================================================================== */
+.ml-body-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
+
+.ml-side-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ml-nav-border);
+  background: var(--ml-nav-active-bg);
+  color: var(--ml-nav-active-text);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 4;
+  transition: background-color 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.ml-side-nav-btn[hidden] {
+  display: none;
+}
+
+.ml-side-nav-btn:hover:not(:disabled) {
+  border-color: var(--ml-card-border-hover);
+}
+
+.ml-side-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* navButtonsPosition: 'gutters' */
+.ml-container[data-nav-position='gutters'] .ml-side-nav-btn {
+  flex-shrink: 0;
+  width: 34px;
+  border-top: none;
+  border-bottom: none;
+  border-radius: 0;
+  background: var(--ml-nav-bg);
+}
+
+.ml-container[data-nav-position='gutters'] .ml-side-nav-btn--prev {
+  border-left: none;
+}
+
+.ml-container[data-nav-position='gutters'] .ml-side-nav-btn--next {
+  border-right: none;
+}
+
+/* navButtonsPosition: 'overTitles' */
+.ml-container[data-nav-position='overTitles'] .ml-side-nav-btn {
+  position: absolute;
+  top: 16px;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  box-shadow: var(--ml-nav-active-shadow);
+}
+
+.ml-container[data-nav-position='overTitles'] .ml-side-nav-btn--prev {
+  left: 10px;
+}
+
+.ml-container[data-nav-position='overTitles'] .ml-side-nav-btn--next {
+  right: 10px;
+}
+
+/* navButtonsPosition: 'overMatches' */
+.ml-container[data-nav-position='overMatches'] .ml-side-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px;
+  height: 44px;
+  border-radius: 8px;
+  box-shadow: var(--ml-card-shadow-hover);
+}
+
+.ml-container[data-nav-position='overMatches'] .ml-side-nav-btn--prev {
+  left: 10px;
+}
+
+.ml-container[data-nav-position='overMatches'] .ml-side-nav-btn--next {
+  right: 10px;
+}
+
+/* 縦スクロールボタン */
+.ml-scroll-btn {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  min-width: 56px;
+  height: 26px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ml-nav-border);
+  border-radius: 999px;
+  background: var(--ml-nav-active-bg);
+  color: var(--ml-nav-active-text);
+  font-size: 0.72rem;
+  cursor: pointer;
+  box-shadow: var(--ml-card-shadow-hover);
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.ml-scroll-btn[hidden] {
+  display: none;
+}
+
+.ml-scroll-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.ml-scroll-btn--up {
+  top: 8px;
+}
+
+.ml-scroll-btn--down {
+  bottom: 8px;
+}
+
+/* verticalScrollMode: 'buttons' の場合はネイティブ縦スクロールバーを隠す */
+.ml-container[data-scroll-mode='buttons'] .ml-viewport {
+  overflow-y: hidden;
+}
+
+/* ==========================================================================
    スクロールビューポート & SVG座標基準ルート
    ========================================================================== */
 .ml-viewport {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -283,12 +424,22 @@
   display: none;
 }
 
+/* useClassicalLayout: true 時に1回戦基準の縦高さを保ったまま横幅だけ畳む */
+.ml-round--classical-hidden {
+  width: 0;
+  min-width: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+  margin-right: calc(-1 * var(--ml-round-gap));
+}
+
 /* ラウンド見出し（縦スクロール時も上部に固定表示） */
 .ml-round-header {
   position: sticky;
   top: 0;
   z-index: 2;
-  font-size: 0.75rem;
+  font-size: var(--ml-header-font-size);
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -316,6 +467,20 @@
   flex: 1;
   display: flex;
   align-items: center;
+}
+
+/* 試合スロット（カード本体 + 上下の getMatchTopHTML / getMatchBottomHTML） */
+.ml-match-slot {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ml-match-top,
+.ml-match-bottom {
+  font-size: 0.72rem;
+  color: var(--ml-text-muted);
 }
 
 /* 試合カード */
@@ -472,7 +637,7 @@
   gap: 7px;
   min-height: 36px;
   padding: 0 0 0 11px;
-  font-size: 0.85rem;
+  font-size: var(--ml-font-size);
   line-height: 1.25;
   transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
 }
@@ -595,6 +760,7 @@
   display: flex;
   align-items: stretch;
   align-self: stretch;
+  gap: var(--ml-score-gap);
   border-left: 1px solid var(--ml-score-divider);
 }
 

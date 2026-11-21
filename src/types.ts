@@ -141,6 +141,36 @@ export type ConnectorType = 'orthogonal' | 'curved';
 export type HighlightTrigger = 'click' | 'hover';
 
 /**
+ * ビルトインテーマ名
+ */
+export type BuiltinTheme = 'light' | 'dark' | 'emerald';
+
+/**
+ * テーマ指定（ビルトインテーマ名、または CSSカスタムプロパティの上書きマップ）
+ */
+export type BracketTheme = BuiltinTheme | Record<string, string>;
+
+/**
+ * 縦スクロール操作モード（Bracketry 互換）
+ */
+export type VerticalScrollMode = 'native' | 'buttons' | 'mixed';
+
+/**
+ * ナビゲーションボタンの配置位置
+ */
+export type NavButtonsPosition = 'top' | 'gutters' | 'overTitles' | 'overMatches' | 'hidden';
+
+/**
+ * 縦スクロールボタンの配置位置
+ */
+export type ScrollButtonsPosition = 'gutters' | 'overMatches' | 'hidden';
+
+/**
+ * カスタムHTMLフックの戻り値型
+ */
+export type CustomMarkupResult = string | HTMLElement | null | undefined;
+
+/**
  * 試合カードクリック時にコールバックへ渡されるコンテキスト情報
  */
 export interface MatchClickContext {
@@ -173,7 +203,7 @@ export interface SideClickContext extends MatchClickContext {
 }
 
 /**
- * カスタムレンダラー（renderSide）へ渡されるコンテキスト情報
+ * カスタムレンダラー（renderSide / getEntryStatusHTML）へ渡されるコンテキスト情報
  */
 export interface SideRenderContext {
   match: Match;
@@ -182,6 +212,14 @@ export interface SideRenderContext {
   order: number;
   sideIndex: 0 | 1;
   isBronzeMatch: boolean;
+}
+
+/**
+ * 選手単位カスタムフック（getNationalityHTML / getPlayerTitleHTML）のコンテキスト
+ */
+export interface PlayerRenderContext extends SideRenderContext {
+  playerIndex: number;
+  contestantId?: string;
 }
 
 /**
@@ -210,25 +248,12 @@ export interface NavigationState {
 }
 
 /**
- * ビルトインテーマ名
- */
-export type BuiltinTheme = 'light' | 'dark' | 'emerald';
-
-/**
- * テーマ指定（ビルトインテーマ名、または CSSカスタムプロパティの上書きマップ）
- */
-export type BracketTheme = BuiltinTheme | Record<string, string>;
-
-/**
- * ブラケット描画時のオプション設定
+ * ブラケット描画時のオプション設定（Bracketry 互換 + matchline 拡張）
  */
 export interface BracketOptions {
-  /** テーマ設定（デフォルト: 'light'）。CSS変数オブジェクト（例: { '--ml-line-color': '#...' }）も指定可能 */
+  // --- テーマ・基本表示 ---
+  /** テーマ設定（デフォルト: 'light'）。CSS変数オブジェクトも指定可能 */
   theme?: BracketTheme;
-  /** 試合カードクリック（またはフォーカス時のEnter/Spaceキー）時のコールバック */
-  onMatchClick?: (match: Match, context: MatchClickContext) => void;
-  /** 参加者スロットクリック時のコールバック */
-  onSideClick?: (side: Side, context: SideClickContext) => void;
   /** 接続線の形状（デフォルト: 'orthogonal'） */
   connectorType?: ConnectorType;
   /** 参加者未定時に表示するラベル（デフォルト: 'TBD'） */
@@ -247,23 +272,107 @@ export interface BracketOptions {
   showVenue?: boolean;
   /** 会場・コート（match.venue）の表示文字列をカスタム整形する関数 */
   formatVenue?: (venue: MatchVenue, match: Match) => string;
+
+  // --- インタラクション・コールバック ---
+  /** 試合カードクリック（またはフォーカス時のEnter/Spaceキー）時のコールバック */
+  onMatchClick?: (match: Match, context: MatchClickContext) => void;
+  /** 参加者スロットクリック時のコールバック */
+  onSideClick?: (side: Side, context: SideClickContext) => void;
+  /** Bracketry 互換: 参加者スロットクリック時のコールバック */
+  onMatchSideClick?: (match: Match, sideIndex: 0 | 1, context: SideClickContext) => void;
   /** 参加者の勝ち上がりパス・ハイライトを有効にするか（デフォルト: true） */
   highlightContestantHistory?: boolean;
+  /** Bracketry 互換: true を指定すると勝ち上がりパス・ハイライトを無効化 */
+  disableHighlight?: boolean;
   /** 勝ち上がりパス・ハイライトの発火トリガー（デフォルト: 'click'） */
   highlightTrigger?: HighlightTrigger;
+
+  // --- ナビゲーション・スクロール・レイアウト制御 ---
   /** ラウンドナビゲーションバーを表示するか（デフォルト: true） */
   showNavigation?: boolean;
+  /** ナビゲーションボタンの配置位置（デフォルト: 'top'） */
+  navButtonsPosition?: NavButtonsPosition;
+  /** 縦スクロール操作モード（デフォルト: 'native'） */
+  verticalScrollMode?: VerticalScrollMode;
+  /** 縦スクロールボタンの配置位置（verticalScrollMode が 'buttons' / 'mixed' 時に有効） */
+  scrollButtonsPosition?: ScrollButtonsPosition;
+  /** ラウンド移動時に縦スクロール位置を先頭へ戻すか（デフォルト: false） */
+  resetScrollOnNavigation?: boolean;
   /**
-   * 同時に表示するラウンド数の上限（任意）
-   * 指定すると baseRoundIndex から指定数だけ表示し、左右ナビゲーションでスライド移動できる
+   * 同時に表示するラウンド数（任意）
+   * - 数値: 指定数だけ表示し左右ナビでスライド移動
+   * - 'auto': ビューポート幅に応じて表示ラウンド数を自動レスポンシブ調整
    */
-  visibleRoundsCount?: number;
+  visibleRoundsCount?: number | 'auto';
   /** 初期表示の開始ラウンドインデックス（デフォルト: 0） */
   initialBaseRoundIndex?: number;
-  /** 参加者スロットのカスタムレンダラー（null を返すとデフォルト描画にフォールバック） */
-  renderSide?: (side: Side | null, context: SideRenderContext) => HTMLElement | string | null;
-  /** 試合カードヘッダーのカスタムレンダラー（null を返すとデフォルト描画にフォールバック） */
-  renderMatchHeader?: (match: Match, context: MatchRenderContext) => HTMLElement | string | null;
+  /**
+   * Bracketry 互換: true の場合、ラウンド移動時も1回戦基準の縦高さを維持する
+   * （デフォルト: false = 表示ラウンドに合わせて縦高さを詰める）
+   */
+  useClassicalLayout?: boolean;
+  /** 前へナビゲーションボタンのカスタムHTML */
+  leftNavButtonHTML?: string;
+  /** 次へナビゲーションボタンのカスタムHTML */
+  rightNavButtonHTML?: string;
+  /** 上スクロールボタンのカスタムHTML */
+  scrollUpButtonHTML?: string;
+  /** 下スクロールボタンのカスタムHTML */
+  scrollDownButtonHTML?: string;
+
+  // --- パーツ単位のカスタムHTML差し替えフック（Bracketry 互換） ---
+  /** 国籍・国旗表示のカスタムHTMLフック */
+  getNationalityHTML?: (player: Player, context: PlayerRenderContext) => CustomMarkupResult;
+  /** シード番号・エントリーステータスのカスタムHTMLフック */
+  getEntryStatusHTML?: (entryStatus: string, context: SideRenderContext) => CustomMarkupResult;
+  /** 選手名・チーム名表示のカスタムHTMLフック */
+  getPlayerTitleHTML?: (player: Player, context: PlayerRenderContext) => CustomMarkupResult;
+  /** 試合カード上部に差し込むカスタムHTMLフック */
+  getMatchTopHTML?: (match: Match) => CustomMarkupResult;
+  /** 試合カード下部に差し込むカスタムHTMLフック */
+  getMatchBottomHTML?: (match: Match) => CustomMarkupResult;
+  /** スコア部分のカスタムHTMLフック */
+  getScoresHTML?: (side: Side, match: Match) => CustomMarkupResult;
+  /** 試合カード要素そのものを自前DOMへ完全差し替えするフック */
+  getMatchElement?: (roundIndex: number, matchOrder: number) => HTMLElement | null | undefined;
+  /** 参加者スロット行のカスタムレンダラー */
+  renderSide?: (side: Side | null, context: SideRenderContext) => CustomMarkupResult;
+  /** 試合カードヘッダーのカスタムレンダラー */
+  renderMatchHeader?: (match: Match, context: MatchRenderContext) => CustomMarkupResult;
+
+  // --- JSオプション経由のスタイル指定（Bracketry 互換、内部で --ml-* へ自動適用） ---
+  /** ルート背景色 */
+  rootBgColor?: string;
+  /** 上下パディング（px） */
+  mainVerticalPadding?: number;
+  /** ラウンド見出しのフォントサイズ（px） */
+  roundTitlesFontSize?: number;
+  /** ラウンド見出しの文字色 */
+  roundTitlesFontColor?: string;
+  /** 試合カードのフォントサイズ（px） */
+  matchFontSize?: number;
+  /** 試合カードの文字色 */
+  matchTextColor?: string;
+  /** 試合カード間の最小縦余白（px） */
+  matchMinVerticalGap?: number;
+  /** 試合カードの幅（px） */
+  matchMaxWidth?: number;
+  /** ラウンド列間の横余白（px） */
+  roundGap?: number;
+  /** スコアセル間の間隔（px） */
+  distanceBetweenScorePairs?: number;
+  /** SVG接続線の太さ（px） */
+  connectionLinesWidth?: number;
+  /** SVG接続線の通常色 */
+  connectionLinesColor?: string;
+  /** ハイライト時のSVG接続線色 */
+  highlightedConnectionLinesColor?: string;
+  /** ハイライト時の参加者文字・アクセント色 */
+  highlightedPlayerTitleColor?: string;
+  /** LIVE試合の枠線・バッジ色 */
+  liveMatchBorderColor?: string;
+  /** ハイライト時に非対象要素を薄くしない（true で不透明度1を維持） */
+  disableOpacity?: boolean;
 }
 
 /**
@@ -276,6 +385,10 @@ export interface BracketInstance {
   replaceData: (data: BracketData) => void;
   /** Bracketry 互換: オプションを更新して再描画する */
   applyNewOptions: (options: Partial<BracketOptions>) => void;
+  /** Bracketry 互換: 現在保持しているトーナメントデータを取得する */
+  getAllData: () => BracketData;
+  /** Bracketry 互換: 現在適用されているオプションを取得する */
+  getUserOptions: () => BracketOptions;
   /** 指定した試合データだけを部分更新して再描画する */
   updateMatches: (updates: MatchUpdate[]) => void;
   /** Bracketry 互換: updateMatches のエイリアス */

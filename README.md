@@ -34,7 +34,8 @@ const data: BracketData = {
       matches: [
         {
           id: 'm1',
-          label: 'Court 1 · 13:00',
+          venue: '第1コート',
+          startTime: '2026-11-21T13:00:00+09:00', // "13:00" や Date も指定可能
           status: 'completed',
           teams: [
             { id: 't1', seed: 1, name: 'チームA', score: [6, { main: 7, sub: 5, isWinner: true }], isWinner: true },
@@ -56,7 +57,8 @@ const data: BracketData = {
       matches: [
         {
           id: 'm3',
-          label: 'Center Court',
+          venue: 'センターコート',
+          startTime: '17:00',
           status: 'live',
           teams: [
             { id: 't1', seed: 1, name: 'チームA', score: [6, 4], isServing: true },
@@ -102,8 +104,31 @@ bracket.updateMatches([
 
 // プログラムからの操作
 bracket.highlightTeam('t1');
+bracket.focusTeam('t1'); // 該当試合へスクロール＆ハイライト
 bracket.moveToNextRound();
 bracket.destroy();
+```
+
+## 大規模トーナメントの自動生成（`generateBracketData`）
+
+16 / 32 / 64 チームや、2のべき乗でないチーム数（BYE自動配置）から標準シード順の `BracketData` を自動生成できます。
+
+```ts
+import { createBracket, generateBracketData } from 'matchline';
+
+const teams = Array.from({ length: 32 }, (_, i) => ({
+  id: `team-${i + 1}`,
+  name: `チーム${i + 1}`,
+}));
+
+const data = generateBracketData(teams, {
+  includeThirdPlace: true,
+  venues: ['第1コート', '第2コート', '第3コート', '第4コート'],
+});
+
+const bracket = createBracket(document.getElementById('bracket')!, data, {
+  visibleRoundsCount: 3, // 3ラウンドずつ表示してナビゲーションで切り替え
+});
 ```
 
 ## CSSカスタムプロパティによるテーマ変更

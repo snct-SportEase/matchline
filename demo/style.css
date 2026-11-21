@@ -82,6 +82,10 @@ body {
   transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
+.demo-stage .ml-container {
+  max-height: 70vh;
+}
+
 /* ダークテーマ（CSSカスタムプロパティ上書き例） */
 .demo-stage[data-theme='dark'] {
   background: #0b1120;
@@ -106,6 +110,7 @@ body {
   --ml-highlight-bg: rgba(56, 189, 248, 0.14);
   --ml-highlight-border: #38bdf8;
   --ml-header-color: #94a3b8;
+  --ml-header-bg: #0b1120;
   --ml-header-border: #1e293b;
   --ml-nav-bg: #0f172a;
   --ml-nav-border: #1e293b;
@@ -124,6 +129,76 @@ body {
   --ml-highlight-bg: rgba(5, 150, 105, 0.09);
   --ml-highlight-border: #059669;
   --ml-line-highlight-color: #059669;
+}
+
+.demo-editor {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.demo-editor h2 {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.demo-editor-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.demo-editor-target {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #0f172a;
+  background: #f1f5f9;
+  padding: 5px 10px;
+  border-radius: 6px;
+}
+
+.demo-editor input {
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #0f172a;
+  width: 150px;
+}
+
+.demo-editor button {
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid #2563eb;
+  border-radius: 7px;
+  background: #2563eb;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.demo-editor button:hover {
+  background: #1d4ed8;
+}
+
+.demo-editor-divider {
+  width: 1px;
+  height: 24px;
+  background: #e2e8f0;
+}
+
+.demo-editor button.demo-btn-secondary {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+.demo-editor button.demo-btn-secondary:hover {
+  background: #f1f5f9;
 }
 
 .demo-log {

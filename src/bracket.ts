@@ -459,6 +459,57 @@ export function createBracket(
       setHighlight(teamKey);
     },
 
+    focusTeam(teamKey: string): boolean {
+      if (isDestroyed || !teamKey) {
+        return false;
+      }
+
+      // 該当チームが出場する最初のラウンドと試合要素を探す
+      let targetRoundIndex = -1;
+      let targetMatchId: string | null = null;
+
+      for (let r = 0; r < currentData.rounds.length; r++) {
+        for (const match of currentData.rounds[r].matches) {
+          if (match.teams.some((t) => getTeamKey(t) === teamKey)) {
+            targetRoundIndex = r;
+            targetMatchId = match.id;
+            break;
+          }
+        }
+        if (targetMatchId) break;
+      }
+
+      if (!targetMatchId && currentData.thirdPlaceMatch) {
+        if (currentData.thirdPlaceMatch.teams.some((t) => getTeamKey(t) === teamKey)) {
+          targetRoundIndex = currentData.rounds.length - 1;
+          targetMatchId = currentData.thirdPlaceMatch.id;
+        }
+      }
+
+      if (!targetMatchId) {
+        return false;
+      }
+
+      // visibleRoundsCount 制限中に対象ラウンドが範囲外なら移動する
+      const restrictMode =
+        typeof currentOptions.visibleRoundsCount === 'number' &&
+        currentOptions.visibleRoundsCount > 0;
+      if (restrictMode && targetRoundIndex >= 0) {
+        const visibleEnd = baseRoundIndex + currentOptions.visibleRoundsCount! - 1;
+        if (targetRoundIndex < baseRoundIndex || targetRoundIndex > visibleEnd) {
+          goToRound(targetRoundIndex);
+        }
+      }
+
+      setHighlight(teamKey);
+
+      const cardEl = renderResult?.matchElements.get(targetMatchId);
+      if (cardEl && typeof cardEl.scrollIntoView === 'function') {
+        cardEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+      }
+      return true;
+    },
+
     moveToPreviousRound(): void {
       goToRound(baseRoundIndex - 1);
     },

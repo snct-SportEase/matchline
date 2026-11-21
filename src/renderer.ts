@@ -207,8 +207,46 @@ function createTeamRow(
   return row;
 }
 
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
+
 /**
- * 試合カード上部のヘッダー行（LIVEバッジ・ラベル・カスタムヘッダー）を生成する
+ * Date または ISO 8601 文字列を見やすい "M/D HH:mm" 形式へデフォルト整形する
+ * 通常の表示用文字列（例: "14:00"）はそのまま返す
+ */
+function defaultFormatStartTime(startTime: string | Date): { text: string; dateTimeAttr?: string } {
+  if (startTime instanceof Date) {
+    if (Number.isNaN(startTime.getTime())) {
+      return { text: '' };
+    }
+    const month = startTime.getMonth() + 1;
+    const day = startTime.getDate();
+    const hours = String(startTime.getHours()).padStart(2, '0');
+    const minutes = String(startTime.getMinutes()).padStart(2, '0');
+    return {
+      text: `${month}/${day} ${hours}:${minutes}`,
+      dateTimeAttr: startTime.toISOString(),
+    };
+  }
+
+  if (ISO_DATETIME_RE.test(startTime)) {
+    const parsed = new Date(startTime);
+    if (!Number.isNaN(parsed.getTime())) {
+      const month = parsed.getMonth() + 1;
+      const day = parsed.getDate();
+      const hours = String(parsed.getHours()).padStart(2, '0');
+      const minutes = String(parsed.getMinutes()).padStart(2, '0');
+      return {
+        text: `${month}/${day} ${hours}:${minutes}`,
+        dateTimeAttr: parsed.toISOString(),
+      };
+    }
+  }
+
+  return { text: startTime, dateTimeAttr: startTime };
+}
+
+/**
+ * 試合カード上部のヘッダー行（ラベル・会場・開始時間・LIVEバッジ・カスタムヘッダー）を生成する
  */
 function createMatchHeader(
   match: Match,
@@ -236,18 +274,86 @@ function createMatchHeader(
   }
 
   const isLive = match.status === 'live';
-  if (!isLive && !match.label) {
+  const showStartTime =
+    options.showStartTime !== false && match.startTime !== undefined && match.startTime !== '';
+  const showVenue =
+    options.showVenue !== false &&
+    match.venue !== undefined &&
+    (typeof match.venue === 'string' ? match.venue !== '' : match.venue.name !== '');
+  const hasLeftInfo = Boolean(match.label || showVenue);
+
+  if (!isLive && !hasLeftInfo && !showStartTime) {
     return null;
   }
 
   const headerEl = document.createElement('div');
   headerEl.className = 'ml-match-header';
 
+  // 左側: 会場・コート名 / ラベル
+  const leftEl = document.createElement('div');
+  leftEl.className = 'ml-match-header-left';
+
+  if (showVenue && match.venue !== undefined) {
+    const venueText =
+      typeof options.formatVenue === 'function'
+        ? options.formatVenue(match.venue, match)
+        : typeof match.venue === 'string'
+          ? match.venue
+          : match.venue.name;
+
+    if (venueText) {
+      const venueEl = document.createElement('span');
+      venueEl.className = 'ml-match-venue';
+      venueEl.dataset.venue =
+        typeof match.venue === 'string' ? match.venue : (match.venue.id ?? match.venue.name);
+
+      if (typeof match.venue !== 'string' && match.venue.color) {
+        const dot = document.createElement('span');
+        dot.className = 'ml-match-venue-dot';
+        dot.style.backgroundColor = match.venue.color;
+        dot.setAttribute('aria-hidden', 'true');
+        venueEl.appendChild(dot);
+      }
+
+      venueEl.appendChild(document.createTextNode(venueText));
+      leftEl.appendChild(venueEl);
+    }
+  }
+
   if (match.label) {
     const labelEl = document.createElement('span');
     labelEl.className = 'ml-match-label';
     labelEl.textContent = match.label;
-    headerEl.appendChild(labelEl);
+    leftEl.appendChild(labelEl);
+  }
+
+  if (leftEl.childNodes.length > 0) {
+    headerEl.appendChild(leftEl);
+  }
+
+  // 右側: 試合開始時間 / LIVEバッジ
+  const rightEl = document.createElement('div');
+  rightEl.className = 'ml-match-header-right';
+
+  if (showStartTime && match.startTime !== undefined) {
+    const formatted =
+      typeof options.formatStartTime === 'function'
+        ? {
+            text: options.formatStartTime(match.startTime, match),
+            dateTimeAttr:
+              match.startTime instanceof Date ? match.startTime.toISOString() : match.startTime,
+          }
+        : defaultFormatStartTime(match.startTime);
+
+    if (formatted.text) {
+      const timeEl = document.createElement('time');
+      timeEl.className = 'ml-match-time';
+      if (formatted.dateTimeAttr) {
+        timeEl.dateTime = formatted.dateTimeAttr;
+      }
+      timeEl.textContent = formatted.text;
+      rightEl.appendChild(timeEl);
+    }
   }
 
   if (isLive) {
@@ -260,10 +366,14 @@ function createMatchHeader(
     badgeEl.appendChild(dotEl);
 
     badgeEl.appendChild(document.createTextNode(match.liveLabel ?? 'LIVE'));
-    headerEl.appendChild(badgeEl);
+    rightEl.appendChild(badgeEl);
   }
 
-  return headerEl;
+  if (rightEl.childNodes.length > 0) {
+    headerEl.appendChild(rightEl);
+  }
+
+  return headerEl.childNodes.length > 0 ? headerEl : null;
 }
 
 /**

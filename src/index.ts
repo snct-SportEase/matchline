@@ -1,4 +1,5 @@
 export { createBracket } from './bracket';
+export { generateBracketData, type GenerateBracketOptions } from './generator';
 export type {
   BracketData,
   BracketInstance,
@@ -12,6 +13,7 @@ export type {
   MatchStatus,
   MatchTeam,
   MatchUpdate,
+  MatchVenue,
   NavigationState,
   Round,
   SetScore,

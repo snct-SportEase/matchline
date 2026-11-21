@@ -45,6 +45,21 @@ export interface MatchTeam {
 export type MatchStatus = 'scheduled' | 'live' | 'completed' | 'bye';
 
 /**
+ * 会場・コート情報
+ * - 文字列（例: "第1コート"）または色・ID付きオブジェクトを指定可能
+ */
+export type MatchVenue =
+  | string
+  | {
+      /** 会場・コートの一意なID（任意） */
+      id?: string;
+      /** 表示名（例: "第1コート", "Aコート"） */
+      name: string;
+      /** 識別用のアクセントカラー（例: "#2563eb"） */
+      color?: string;
+    };
+
+/**
  * 1試合を表すデータ構造
  */
 export interface Match {
@@ -59,7 +74,11 @@ export interface Match {
   nextMatchId?: string;
   /** 試合ステータス（任意） */
   status?: MatchStatus;
-  /** 試合カード上部に表示するラベル（例: "コートA · 14:00", "第1試合"） */
+  /** 試合開始日時（"14:00" 等の文字列、ISO 8601 文字列、または Date オブジェクト） */
+  startTime?: string | Date;
+  /** 会場・コート情報（例: "第1コート", { name: "Aコート", color: "#2563eb" }） */
+  venue?: MatchVenue;
+  /** 試合カード上部に表示する補助ラベル（例: "第1試合", "決勝戦"） */
   label?: string;
   /** status === 'live' 時のバッジ表示テキスト（デフォルト: "LIVE"） */
   liveLabel?: string;
@@ -190,6 +209,14 @@ export interface BracketOptions {
   byeLabel?: string;
   /** ラウンド見出しを表示するかどうか（デフォルト: true） */
   showRoundHeaders?: boolean;
+  /** 試合開始時間（match.startTime）を表示するかどうか（デフォルト: true） */
+  showStartTime?: boolean;
+  /** 試合開始時間（match.startTime）の表示文字列をカスタム整形する関数 */
+  formatStartTime?: (startTime: string | Date, match: Match) => string;
+  /** 会場・コート（match.venue）を表示するかどうか（デフォルト: true） */
+  showVenue?: boolean;
+  /** 会場・コート（match.venue）の表示文字列をカスタム整形する関数 */
+  formatVenue?: (venue: MatchVenue, match: Match) => string;
   /** チームの勝ち上がりパス・ハイライトを有効にするか（デフォルト: true） */
   highlightTeamHistory?: boolean;
   /** 勝ち上がりパス・ハイライトの発火トリガー（デフォルト: 'click'） */
@@ -219,6 +246,8 @@ export interface BracketInstance {
   updateMatches: (updates: MatchUpdate[]) => void;
   /** 指定したチームキー（team.id または team.name）の勝ち上がりパスをハイライト／解除する */
   highlightTeam: (teamKey: string | null) => void;
+  /** 指定したチームをハイライトし、該当する試合カードへスクロールする（大規模トーナメント向け） */
+  focusTeam: (teamKey: string) => boolean;
   /** 前のラウンドへ移動する */
   moveToPreviousRound: () => void;
   /** 次のラウンドへ移動する */

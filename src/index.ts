@@ -1,22 +1,28 @@
 export { createBracket } from './bracket';
-export { generateBracketData, type GenerateBracketOptions } from './generator';
+export {
+  generateBracketData,
+  type GenerateBracketOptions,
+  type SeedContestantInput,
+} from './generator';
 export type {
   BracketData,
   BracketInstance,
   BracketOptions,
+  BracketTheme,
+  BuiltinTheme,
   ConnectorType,
+  Contestant,
   HighlightTrigger,
   Match,
   MatchClickContext,
   MatchRenderContext,
-  MatchScore,
-  MatchStatus,
-  MatchTeam,
   MatchUpdate,
   MatchVenue,
   NavigationState,
+  Player,
   Round,
-  SetScore,
-  TeamClickContext,
-  TeamRenderContext,
+  Score,
+  Side,
+  SideClickContext,
+  SideRenderContext,
 } from './types';

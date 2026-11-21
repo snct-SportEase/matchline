@@ -1,5 +1,5 @@
-import { getTeamKey } from './renderer';
-import type { BracketData, ConnectorType, Match } from './types';
+import { getContestantKey, getMatchKey } from './renderer';
+import type { ConnectorType, Match } from './types';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -7,8 +7,8 @@ interface ConnectorSpec {
   d: string;
   isWinner: boolean;
   isHighlighted: boolean;
-  fromId: string;
-  toId: string;
+  fromKey: string;
+  toKey: string;
 }
 
 /**
@@ -35,14 +35,13 @@ function buildPathData(
  * 指定された試合の次ラウンド接続先マッチを解決する
  */
 function resolveNextMatch(
-  data: BracketData,
+  normalizedRounds: Match[][],
   roundIndex: number,
-  matchIndex: number,
   match: Match,
 ): Match | null {
   if (match.nextMatchId) {
-    for (const round of data.rounds) {
-      const found = round.matches.find((m) => m.id === match.nextMatchId);
+    for (const roundMatches of normalizedRounds) {
+      const found = roundMatches.find((m) => getMatchKey(m) === match.nextMatchId);
       if (found) {
         return found;
       }
@@ -50,37 +49,39 @@ function resolveNextMatch(
     return null;
   }
 
-  const nextRound = data.rounds[roundIndex + 1];
-  if (!nextRound || nextRound.matches.length === 0) {
+  const nextRound = normalizedRounds[roundIndex + 1];
+  if (!nextRound || nextRound.length === 0) {
     return null;
   }
 
-  const targetIndex = Math.floor(matchIndex / 2);
-  return nextRound.matches[targetIndex] ?? null;
+  const targetOrder = Math.floor(match.order / 2);
+  return nextRound[targetOrder] ?? null;
 }
 
 /**
- * 指定されたチームキーがこの試合で勝利して次ラウンドへ進んだ（または両試合に登場する）かを判定する
+ * 指定された参加者キーがこの試合で勝利して次ラウンドへ進んだ（または両試合に登場する）かを判定する
  */
-function isConnectorHighlightedForTeam(
+function isConnectorHighlightedForContestant(
   fromMatch: Match,
   toMatch: Match,
-  highlightedTeamKey: string | null,
+  highlightedContestantKey: string | null,
 ): boolean {
-  if (!highlightedTeamKey) {
+  if (!highlightedContestantKey) {
     return false;
   }
 
-  const inFromAsWinner = fromMatch.teams.some(
-    (team) => getTeamKey(team) === highlightedTeamKey && Boolean(team?.isWinner),
+  const fromSides = fromMatch.sides ?? [];
+  const toSides = toMatch.sides ?? [];
+
+  const inFromAsWinner = fromSides.some(
+    (side) => getContestantKey(side) === highlightedContestantKey && Boolean(side.isWinner),
   );
   if (inFromAsWinner) {
     return true;
   }
 
-  // 勝者フラグが未設定でも、前後両方の試合に同じチームがいれば勝ち上がりパスとみなす
-  const inFrom = fromMatch.teams.some((team) => getTeamKey(team) === highlightedTeamKey);
-  const inTo = toMatch.teams.some((team) => getTeamKey(team) === highlightedTeamKey);
+  const inFrom = fromSides.some((side) => getContestantKey(side) === highlightedContestantKey);
+  const inTo = toSides.some((side) => getContestantKey(side) === highlightedContestantKey);
   return inFrom && inTo;
 }
 
@@ -90,10 +91,10 @@ function isConnectorHighlightedForTeam(
 export function drawConnectors(
   rootEl: HTMLElement,
   svgEl: SVGSVGElement,
-  data: BracketData,
+  normalizedRounds: Match[][],
   matchElements: Map<string, HTMLElement>,
   connectorType: ConnectorType = 'orthogonal',
-  highlightedTeamKey: string | null = null,
+  highlightedContestantKey: string | null = null,
 ): void {
   const rootRect = rootEl.getBoundingClientRect();
   const width = Math.max(rootEl.scrollWidth, Math.ceil(rootRect.width));
@@ -112,18 +113,19 @@ export function drawConnectors(
   const winnerSpecs: ConnectorSpec[] = [];
   const highlightedSpecs: ConnectorSpec[] = [];
 
-  for (let roundIndex = 0; roundIndex < data.rounds.length - 1; roundIndex++) {
-    const round = data.rounds[roundIndex];
+  for (let roundIndex = 0; roundIndex < normalizedRounds.length - 1; roundIndex++) {
+    const roundMatches = normalizedRounds[roundIndex];
 
-    for (let matchIndex = 0; matchIndex < round.matches.length; matchIndex++) {
-      const match = round.matches[matchIndex];
-      const nextMatch = resolveNextMatch(data, roundIndex, matchIndex, match);
+    for (const match of roundMatches) {
+      const nextMatch = resolveNextMatch(normalizedRounds, roundIndex, match);
       if (!nextMatch) {
         continue;
       }
 
-      const fromEl = matchElements.get(match.id);
-      const toEl = matchElements.get(nextMatch.id);
+      const fromKey = getMatchKey(match);
+      const toKey = getMatchKey(nextMatch);
+      const fromEl = matchElements.get(fromKey);
+      const toEl = matchElements.get(toKey);
       if (!fromEl || !toEl) {
         continue;
       }
@@ -131,7 +133,7 @@ export function drawConnectors(
       const fromRect = fromEl.getBoundingClientRect();
       const toRect = toEl.getBoundingClientRect();
 
-      // ラウンドナビゲーション等で非表示（サイズ0）の要素間は接続線を描画しない
+      // 非表示ラウンドの要素間は接続線を描画しない
       if (fromRect.width === 0 || fromRect.height === 0 || toRect.width === 0 || toRect.height === 0) {
         continue;
       }
@@ -141,15 +143,19 @@ export function drawConnectors(
       const x2 = toRect.left - rootRect.left;
       const y2 = toRect.top + toRect.height / 2 - rootRect.top;
 
-      const isWinner = match.teams.some((team) => Boolean(team?.isWinner));
-      const isHighlighted = isConnectorHighlightedForTeam(match, nextMatch, highlightedTeamKey);
+      const isWinner = (match.sides ?? []).some((side) => Boolean(side.isWinner));
+      const isHighlighted = isConnectorHighlightedForContestant(
+        match,
+        nextMatch,
+        highlightedContestantKey,
+      );
 
       const spec: ConnectorSpec = {
         d: buildPathData(x1, y1, x2, y2, connectorType),
         isWinner,
         isHighlighted,
-        fromId: match.id,
-        toId: nextMatch.id,
+        fromKey,
+        toKey,
       };
 
       if (isHighlighted) {
@@ -177,8 +183,8 @@ export function drawConnectors(
       classes.push('ml-connector--highlighted');
     }
     path.setAttribute('class', classes.join(' '));
-    path.setAttribute('data-from', spec.fromId);
-    path.setAttribute('data-to', spec.toId);
+    path.setAttribute('data-from', spec.fromKey);
+    path.setAttribute('data-to', spec.toKey);
     fragment.appendChild(path);
   }
 

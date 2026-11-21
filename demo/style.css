@@ -86,51 +86,6 @@ body {
   max-height: 70vh;
 }
 
-/* ダークテーマ（CSSカスタムプロパティ上書き例） */
-.demo-stage[data-theme='dark'] {
-  background: #0b1120;
-  border-color: #1e293b;
-}
-
-.demo-stage[data-theme='dark'] .ml-container {
-  --ml-card-bg: #1e293b;
-  --ml-card-border: #334155;
-  --ml-card-border-hover: #64748b;
-  --ml-card-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-  --ml-text-color: #f1f5f9;
-  --ml-text-muted: #94a3b8;
-  --ml-seed-color: #94a3b8;
-  --ml-divider-color: #334155;
-  --ml-score-color: #cbd5e1;
-  --ml-score-divider: #334155;
-  --ml-winner-color: #ffffff;
-  --ml-winner-score-color: #ffffff;
-  --ml-winner-accent: #38bdf8;
-  --ml-highlight-color: #38bdf8;
-  --ml-highlight-bg: rgba(56, 189, 248, 0.14);
-  --ml-highlight-border: #38bdf8;
-  --ml-header-color: #94a3b8;
-  --ml-header-bg: #0b1120;
-  --ml-header-border: #1e293b;
-  --ml-nav-bg: #0f172a;
-  --ml-nav-border: #1e293b;
-  --ml-nav-text: #94a3b8;
-  --ml-nav-active-bg: #1e293b;
-  --ml-nav-active-text: #f8fafc;
-  --ml-line-color: #334155;
-  --ml-line-active-color: #64748b;
-  --ml-line-highlight-color: #38bdf8;
-}
-
-/* エメラルドテーマ（CSSカスタムプロパティ上書き例） */
-.demo-stage[data-theme='emerald'] .ml-container {
-  --ml-winner-accent: #059669;
-  --ml-highlight-color: #059669;
-  --ml-highlight-bg: rgba(5, 150, 105, 0.09);
-  --ml-highlight-border: #059669;
-  --ml-line-highlight-color: #059669;
-}
-
 .demo-editor {
   background: #ffffff;
   border: 1px solid #e2e8f0;

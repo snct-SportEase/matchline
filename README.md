@@ -1,19 +1,22 @@
 # matchline
 
 依存ゼロ・Vanilla TypeScript製のトーナメント表（ブラケット）描画ライブラリです。
-[bracketry](https://bracketry.app/) の使い勝手を参考に、React や Vue などのフレームワークに依存せず Pure DOM API と SVG API のみで動作するよう設計されています。
+[bracketry](https://bracketry.app/) のデータ構造（`rounds` / `matches` / `contestants` / `sides` / `scores`）と高い互換性を持ち、既存の `bracketry` からの移行もスムーズに行えます。
 
 ## 主な特徴
 
-- **ランタイム依存ゼロ**: 軽量でどのフロントエンド環境でも利用可能
+- **ランタイム依存ゼロ**: Pure TypeScript / DOM API / SVG API のみで動作
+- **Bracketry 互換データ構造＆API**:
+  - `{ rounds, matches, contestants }` 形式をそのまま受け入れ可能（未登録の将来ラウンド枠も自動補完）
+  - `createBracket(data, container, options)` / `createBracket(container, data, options)` の両方の引数順に対応
+  - `replaceData` / `applyMatchesUpdates` / `applyNewOptions` / `highlightContestantHistory` / `uninstall` などの互換メソッドを標準搭載
 - **ハイブリッド描画**:
   - 試合カードは HTML DOM（Flexbox）で構築し、テキスト省略・CSSカスタマイズ・イベント処理が容易
   - 接続線（コネクタ）は背面 `<svg>` に `<path>` で描画し、`ResizeObserver` によりリサイズ時も自動追従
-- **勝ち上がりパス・ハイライト**: チームをクリックまたはホバーすると、そのチームの全ラウンドの戦績とSVG接続線を強調表示
-- **ラウンドナビゲーション＆モバイル対応**: 左右ボタン・ラウンドピルで移動可能。`visibleRoundsCount` 指定時は表示ラウンドを絞ってコンパクトに表示
-- **競技に合わせた表現**: 単一スコア・複数セットスコア（タイブレーク上付き表記含む）、`LIVE` バッジ、サーブ権ドット、3位決定戦に対応
-- **拡張性**: `renderTeam` / `renderMatchHeader` によるカスタムレンダリングと、`updateMatches()` による特定試合の部分更新APIを提供
-- **テーマカスタマイズ**: CSSカスタムプロパティ（`--ml-*`）で簡単に見た目を変更可能
+- **大会運営向けの拡張機能**:
+  - 試合開始日時（`startTime`）、会場・コート（`venue`、色識別子対応）、補助ラベル（`label`）
+  - 複数セットスコア・タイブレーク（`subscore`）・現在ポイント（`currentScore`）・サーブ権（`isServing`）・`isLive`・3位決定戦（`isBronzeMatch`）
+  - 16 / 32 / 64チーム以上の大規模トーナメント自動生成（`generateBracketData`）＆BYE自動配置
 
 ## インストール
 
@@ -21,113 +24,115 @@
 npm install matchline
 ```
 
-## 基本的な使い方
+## 基本的な使い方（Bracketry 互換形式）
 
 ```ts
 import { createBracket, type BracketData } from 'matchline';
 import 'matchline/style.css';
 
 const data: BracketData = {
-  rounds: [
+  rounds: [{ name: '準決勝' }, { name: '決勝' }],
+  contestants: {
+    c1: { entryStatus: '1', players: [{ title: '東京サンダーズ', nationality: '🇯🇵' }] },
+    c2: { entryStatus: '4', players: [{ title: '大阪スターズ', nationality: '🇯🇵' }] },
+    c3: { entryStatus: '2', players: [{ title: '福岡ウェーブス', nationality: '🇯🇵' }] },
+    c4: { entryStatus: '3', players: [{ title: '横浜ベイサイド', nationality: '🇯🇵' }] },
+  },
+  matches: [
     {
-      name: '準決勝',
-      matches: [
+      roundIndex: 0,
+      order: 0,
+      venue: '第1コート',
+      startTime: '2026-11-21T13:00:00+09:00',
+      sides: [
         {
-          id: 'm1',
-          venue: '第1コート',
-          startTime: '2026-11-21T13:00:00+09:00', // "13:00" や Date も指定可能
-          status: 'completed',
-          teams: [
-            { id: 't1', seed: 1, name: 'チームA', score: [6, { main: 7, sub: 5, isWinner: true }], isWinner: true },
-            { id: 't2', seed: 4, name: 'チームB', score: [4, { main: 6, sub: 3 }] },
+          contestantId: 'c1',
+          isWinner: true,
+          scores: [
+            { mainScore: 6, isWinner: true },
+            { mainScore: 7, subscore: 5, isWinner: true },
           ],
         },
         {
-          id: 'm2',
-          status: 'completed',
-          teams: [
-            { id: 't3', seed: 2, name: 'チームC', score: [3, 4] },
-            { id: 't4', seed: 3, name: 'チームD', score: [6, 6], isWinner: true },
+          contestantId: 'c2',
+          scores: [{ mainScore: 4 }, { mainScore: 6, subscore: 3 }],
+        },
+      ],
+    },
+    {
+      roundIndex: 0,
+      order: 1,
+      venue: '第2コート',
+      startTime: '13:00',
+      sides: [
+        { contestantId: 'c3', scores: [{ mainScore: 3 }, { mainScore: 4 }] },
+        {
+          contestantId: 'c4',
+          isWinner: true,
+          scores: [
+            { mainScore: 6, isWinner: true },
+            { mainScore: 6, isWinner: true },
           ],
         },
       ],
     },
     {
-      name: '決勝',
-      matches: [
-        {
-          id: 'm3',
-          venue: 'センターコート',
-          startTime: '17:00',
-          status: 'live',
-          teams: [
-            { id: 't1', seed: 1, name: 'チームA', score: [6, 4], isServing: true },
-            { id: 't4', seed: 3, name: 'チームD', score: [4, 4] },
-          ],
-        },
+      roundIndex: 1,
+      order: 0,
+      venue: { id: 'center', name: 'センターコート', color: '#ef4444' },
+      startTime: '17:00',
+      isLive: true,
+      sides: [
+        { contestantId: 'c1', scores: [{ mainScore: 6, isWinner: true }, { mainScore: 4 }], currentScore: '30', isServing: true },
+        { contestantId: 'c4', scores: [{ mainScore: 4 }, { mainScore: 4 }], currentScore: '15' },
       ],
     },
   ],
-  thirdPlaceTitle: '3位決定戦',
-  thirdPlaceMatch: {
-    id: 'm-3rd',
-    status: 'scheduled',
-    teams: [
-      { id: 't2', seed: 4, name: 'チームB', score: null },
-      { id: 't3', seed: 2, name: 'チームC', score: null },
-    ],
-  },
 };
 
 const container = document.getElementById('bracket')!;
-const bracket = createBracket(container, data, {
+const bracket = createBracket(data, container, {
+  theme: 'light', // 'light' | 'dark' | 'emerald' または { '--ml-line-color': '#...' }
   connectorType: 'orthogonal', // 'orthogonal' | 'curved'
-  highlightTeamHistory: true,
+  highlightContestantHistory: true,
   highlightTrigger: 'click', // 'click' | 'hover'
   showNavigation: true,
-  onMatchClick: (match, ctx) => {
-    console.log('試合クリック:', match.id, ctx.round?.name);
-  },
 });
 
-// 特定試合のみを部分更新（ライブスコア更新など）
-bracket.updateMatches([
+// 特定試合のみを部分更新（Bracketry 互換）
+bracket.applyMatchesUpdates([
   {
-    id: 'm3',
-    status: 'completed',
-    teams: [
-      { id: 't1', seed: 1, name: 'チームA', score: [6, 6], isWinner: true },
-      { id: 't4', seed: 3, name: 'チームD', score: [4, 4] },
-    ],
+    roundIndex: 1,
+    order: 0,
+    venue: '第3コート',
+    startTime: '17:30',
   },
 ]);
 
 // プログラムからの操作
-bracket.highlightTeam('t1');
-bracket.focusTeam('t1'); // 該当試合へスクロール＆ハイライト
+bracket.highlightContestantHistory('c1');
+bracket.focusContestant('c1');
 bracket.moveToNextRound();
-bracket.destroy();
+bracket.uninstall(); // または bracket.destroy()
 ```
 
 ## 大規模トーナメントの自動生成（`generateBracketData`）
 
-16 / 32 / 64 チームや、2のべき乗でないチーム数（BYE自動配置）から標準シード順の `BracketData` を自動生成できます。
-
 ```ts
 import { createBracket, generateBracketData } from 'matchline';
 
-const teams = Array.from({ length: 32 }, (_, i) => ({
+const entries = Array.from({ length: 32 }, (_, i) => ({
   id: `team-${i + 1}`,
-  name: `チーム${i + 1}`,
+  title: `チーム${i + 1}`,
 }));
 
-const data = generateBracketData(teams, {
-  includeThirdPlace: true,
+const data = generateBracketData(entries, {
+  includeBronzeMatch: true,
   venues: ['第1コート', '第2コート', '第3コート', '第4コート'],
 });
 
-const bracket = createBracket(document.getElementById('bracket')!, data, {
-  visibleRoundsCount: 3, // 3ラウンドずつ表示してナビゲーションで切り替え
+const bracket = createBracket(data, document.getElementById('bracket')!, {
+  visibleRoundsCount: 3,
 });
 ```
 
@@ -149,15 +154,8 @@ const bracket = createBracket(document.getElementById('bracket')!, data, {
 ## 開発コマンド
 
 ```bash
-# 依存パッケージのインストール
-npm install
-
-# ライブラリのビルド（ESM / CJS / 型定義 / CSS）
-npm run build
-
-# 型チェック
-npm run typecheck
-
-# デモページの起動（Vite）
-npm run dev
+npm install      # 依存パッケージのインストール
+npm run build    # ライブラリのビルド（ESM / CJS / 型定義 / CSS）
+npm run typecheck # 型チェック
+npm run dev      # デモページの起動（Vite）
 ```

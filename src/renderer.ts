@@ -1,23 +1,25 @@
 import type {
   BracketData,
   BracketOptions,
+  Contestant,
   Match,
-  MatchScore,
-  MatchTeam,
   NavigationState,
-  SetScore,
+  Score,
+  Side,
 } from './types';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
+const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
 
 /**
- * イベント委譲で参照する試合メタ情報
+ * イベント委譲・コネクタ描画で参照する試合メタ情報
  */
 export interface MatchMeta {
+  matchKey: string;
   match: Match;
   roundIndex: number;
-  matchIndex: number;
-  isThirdPlace: boolean;
+  order: number;
+  isBronzeMatch: boolean;
 }
 
 /**
@@ -30,188 +32,116 @@ export interface RenderResult {
   roundsElement: HTMLDivElement;
   /** ラウンドインデックスからラウンドDOM要素へのマップ */
   roundElements: Map<number, HTMLElement>;
-  /** マッチIDから試合カードDOM要素へのマップ */
+  /** 正規化済みのラウンド別試合リスト（未登録枠を自動補完済み） */
+  normalizedRounds: Match[][];
+  /** 3位決定戦（存在する場合） */
+  bronzeMatch: Match | null;
+  /** マッチキーから試合カードDOM要素へのマップ */
   matchElements: Map<string, HTMLElement>;
-  /** マッチIDからデータ・インデックス情報へのマップ（イベント委譲用） */
+  /** マッチキーからデータ・位置情報へのマップ */
   matchMetaMap: Map<string, MatchMeta>;
 }
 
 /**
- * チームの勝ち上がりパス識別用キーを取得する（id を優先し、なければ name を使用）
+ * 試合の一意キーを解決する（id 指定があれば優先、なければ roundIndex/order から生成）
  */
-export function getTeamKey(team: MatchTeam | null | undefined): string | null {
-  if (!team || team.isBye) {
+export function getMatchKey(match: Match): string {
+  if (match.id) {
+    return match.id;
+  }
+  if (isBronze(match)) {
+    return 'bronze';
+  }
+  return `r${match.roundIndex}-o${match.order}`;
+}
+
+/**
+ * 3位決定戦かどうかを判定する
+ */
+export function isBronze(match: Match): boolean {
+  return Boolean(match.isBronzeMatch);
+}
+
+/**
+ * 参加者スロットの勝ち上がりパス識別キーを取得する（contestantId を優先し、なければ title）
+ */
+export function getContestantKey(side: Side | null | undefined): string | null {
+  if (!side || side.isBye) {
     return null;
   }
-  if (team.id !== undefined && team.id !== '') {
-    return team.id;
+  if (side.contestantId !== undefined && side.contestantId !== '') {
+    return side.contestantId;
   }
-  if (team.name !== undefined && team.name !== '') {
-    return team.name;
+  if (side.title !== undefined && side.title !== '') {
+    return side.title;
   }
   return null;
 }
 
 /**
- * 値が SetScore オブジェクトかどうか判定する
+ * BracketData のフラットな matches 配列を、ラウンド別2次元配列（未登録枠は自動補完）へ正規化する
  */
-function isSetScoreObject(value: number | string | SetScore): value is SetScore {
-  return typeof value === 'object' && value !== null && 'main' in value;
-}
+export function normalizeBracketMatches(data: BracketData): {
+  normalizedRounds: Match[][];
+  bronzeMatch: Match | null;
+} {
+  const totalRounds = data.rounds.length;
+  const allMatches = data.matches ?? [];
+  let bronzeMatch: Match | null = null;
 
-/**
- * スコア領域（単一スコアまたは複数セットスコア）を生成する
- */
-function createScoreElement(score: MatchScore): HTMLDivElement {
-  const scoresWrap = document.createElement('div');
-  scoresWrap.className = 'ml-team-scores';
+  const byRound = new Map<number, Map<number, Match>>();
+  const maxOrderByRound = new Map<number, number>();
 
-  if (Array.isArray(score)) {
-    scoresWrap.classList.add('ml-team-scores--multi');
-    for (const item of score) {
-      const cell = document.createElement('span');
-      cell.className = 'ml-team-score';
+  for (const match of allMatches) {
+    if (isBronze(match)) {
+      bronzeMatch = match;
+      continue;
+    }
+    if (match.roundIndex < 0 || match.roundIndex >= totalRounds) {
+      continue;
+    }
+    let orderMap = byRound.get(match.roundIndex);
+    if (!orderMap) {
+      orderMap = new Map<number, Match>();
+      byRound.set(match.roundIndex, orderMap);
+    }
+    orderMap.set(match.order, match);
 
-      if (isSetScoreObject(item)) {
-        if (item.isWinner) {
-          cell.classList.add('ml-team-score--set-winner');
-        }
-        cell.appendChild(document.createTextNode(String(item.main)));
-        if (item.sub !== undefined && item.sub !== '') {
-          const sup = document.createElement('sup');
-          sup.className = 'ml-team-score-sub';
-          sup.textContent = String(item.sub);
-          cell.appendChild(sup);
-        }
+    const prevMax = maxOrderByRound.get(match.roundIndex) ?? -1;
+    if (match.order > prevMax) {
+      maxOrderByRound.set(match.roundIndex, match.order);
+    }
+  }
+
+  const normalizedRounds: Match[][] = [];
+  for (let roundIndex = 0; roundIndex < totalRounds; roundIndex++) {
+    const standardCount = 2 ** (totalRounds - 1 - roundIndex);
+    const actualCount = (maxOrderByRound.get(roundIndex) ?? -1) + 1;
+    const matchCount = Math.max(standardCount, actualCount);
+    const orderMap = byRound.get(roundIndex);
+
+    const roundMatches: Match[] = [];
+    for (let order = 0; order < matchCount; order++) {
+      const existing = orderMap?.get(order);
+      if (existing) {
+        roundMatches.push(existing);
       } else {
-        cell.textContent = String(item);
+        // 未登録の将来ラウンド枠を自動補完する（Bracketry 互換挙動）
+        roundMatches.push({
+          roundIndex,
+          order,
+          sides: [],
+        });
       }
-
-      scoresWrap.appendChild(cell);
     }
-  } else {
-    const cell = document.createElement('span');
-    cell.className = 'ml-team-score';
-    cell.textContent = String(score);
-    scoresWrap.appendChild(cell);
+    normalizedRounds.push(roundMatches);
   }
 
-  return scoresWrap;
+  return { normalizedRounds, bronzeMatch };
 }
-
-/**
- * 単一チーム行（スロット）のDOM要素を生成する
- */
-function createTeamRow(
-  team: MatchTeam | null,
-  match: Match,
-  roundIndex: number,
-  matchIndex: number,
-  teamIndex: 0 | 1,
-  isThirdPlace: boolean,
-  options: BracketOptions,
-  tbdLabel: string,
-  byeLabel: string,
-): HTMLDivElement {
-  const row = document.createElement('div');
-  row.className = 'ml-team';
-  row.dataset.teamIndex = String(teamIndex);
-
-  const teamKey = getTeamKey(team);
-  if (teamKey) {
-    row.dataset.teamKey = teamKey;
-  }
-
-  if (!team) {
-    row.classList.add('ml-team--tbd');
-  } else {
-    if (team.isWinner) {
-      row.classList.add('ml-team--winner');
-    }
-    if (team.isBye) {
-      row.classList.add('ml-team--bye');
-    }
-    if (!team.isBye && !team.name) {
-      row.classList.add('ml-team--tbd');
-    }
-  }
-
-  if (teamKey && (options.highlightTeamHistory !== false || typeof options.onTeamClick === 'function')) {
-    row.classList.add('ml-team--interactive');
-  }
-
-  // カスタムレンダラーが指定されていれば優先使用する
-  if (typeof options.renderTeam === 'function') {
-    const custom = options.renderTeam(team, {
-      match,
-      roundIndex,
-      matchIndex,
-      teamIndex,
-      isThirdPlace,
-    });
-    if (custom !== null) {
-      if (typeof custom === 'string') {
-        const span = document.createElement('span');
-        span.className = 'ml-team-custom';
-        span.textContent = custom;
-        row.appendChild(span);
-      } else {
-        row.appendChild(custom);
-      }
-      return row;
-    }
-  }
-
-  // シード番号
-  if (team?.seed !== undefined) {
-    const seedEl = document.createElement('span');
-    seedEl.className = 'ml-team-seed';
-    seedEl.textContent = String(team.seed);
-    row.appendChild(seedEl);
-  }
-
-  // 国旗 / アイコンバッジ
-  if (team?.flag) {
-    const flagEl = document.createElement('span');
-    flagEl.className = 'ml-team-flag';
-    flagEl.textContent = team.flag;
-    row.appendChild(flagEl);
-  }
-
-  // チーム名
-  const nameEl = document.createElement('span');
-  nameEl.className = 'ml-team-name';
-  let displayName = tbdLabel;
-  if (team?.isBye) {
-    displayName = team.name || byeLabel;
-  } else if (team?.name) {
-    displayName = team.name;
-  }
-  nameEl.textContent = displayName;
-  nameEl.title = displayName;
-  row.appendChild(nameEl);
-
-  // サーブ権などのアクティブドット
-  if (team?.isServing) {
-    const serveEl = document.createElement('span');
-    serveEl.className = 'ml-team-serving';
-    serveEl.setAttribute('aria-label', 'サーブ中');
-    row.appendChild(serveEl);
-  }
-
-  // スコア（null / undefined 以外の場合に表示）
-  if (team && team.score !== undefined && team.score !== null) {
-    row.appendChild(createScoreElement(team.score));
-  }
-
-  return row;
-}
-
-const ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/;
 
 /**
  * Date または ISO 8601 文字列を見やすい "M/D HH:mm" 形式へデフォルト整形する
- * 通常の表示用文字列（例: "14:00"）はそのまま返す
  */
 function defaultFormatStartTime(startTime: string | Date): { text: string; dateTimeAttr?: string } {
   if (startTime instanceof Date) {
@@ -246,20 +176,206 @@ function defaultFormatStartTime(startTime: string | Date): { text: string; dateT
 }
 
 /**
- * 試合カード上部のヘッダー行（ラベル・会場・開始時間・LIVEバッジ・カスタムヘッダー）を生成する
+ * スコア領域（scores 配列 + currentScore）を生成する
+ */
+function createScoresElement(
+  scores: Score[] | undefined,
+  currentScore: number | string | undefined,
+): HTMLDivElement | null {
+  const hasScores = Array.isArray(scores) && scores.length > 0;
+  const hasCurrent = currentScore !== undefined && currentScore !== '';
+
+  if (!hasScores && !hasCurrent) {
+    return null;
+  }
+
+  const scoresWrap = document.createElement('div');
+  scoresWrap.className = 'ml-team-scores';
+  if ((scores?.length ?? 0) > 1 || (hasScores && hasCurrent)) {
+    scoresWrap.classList.add('ml-team-scores--multi');
+  }
+
+  if (hasScores) {
+    for (const item of scores!) {
+      const cell = document.createElement('span');
+      cell.className = 'ml-team-score';
+      if (item.isWinner) {
+        cell.classList.add('ml-team-score--set-winner');
+      }
+      cell.appendChild(document.createTextNode(String(item.mainScore)));
+      if (item.subscore !== undefined && item.subscore !== '') {
+        const sup = document.createElement('sup');
+        sup.className = 'ml-team-score-sub';
+        sup.textContent = String(item.subscore);
+        cell.appendChild(sup);
+      }
+      scoresWrap.appendChild(cell);
+    }
+  }
+
+  if (hasCurrent) {
+    const currentCell = document.createElement('span');
+    currentCell.className = 'ml-team-score ml-team-score--current';
+    currentCell.textContent = String(currentScore);
+    scoresWrap.appendChild(currentCell);
+  }
+
+  return scoresWrap;
+}
+
+/**
+ * 単一の参加者スロット行（Side）のDOM要素を生成する
+ */
+function createSideRow(
+  side: Side | null,
+  contestants: Record<string, Contestant> | undefined,
+  match: Match,
+  sideIndex: 0 | 1,
+  isBronzeMatch: boolean,
+  options: BracketOptions,
+  tbdLabel: string,
+  byeLabel: string,
+): HTMLDivElement {
+  const row = document.createElement('div');
+  row.className = 'ml-team';
+  row.dataset.sideIndex = String(sideIndex);
+
+  const contestant =
+    side?.contestantId && contestants ? (contestants[side.contestantId] ?? null) : null;
+  const contestantKey = getContestantKey(side);
+
+  if (contestantKey) {
+    row.dataset.contestantKey = contestantKey;
+  }
+
+  const hasName = Boolean(
+    (contestant && contestant.players.length > 0) || (side?.title && side.title !== ''),
+  );
+
+  if (!side) {
+    row.classList.add('ml-team--tbd');
+  } else {
+    if (side.isWinner) {
+      row.classList.add('ml-team--winner');
+    }
+    if (side.isBye) {
+      row.classList.add('ml-team--bye');
+    }
+    if (!side.isBye && !hasName) {
+      row.classList.add('ml-team--tbd');
+    }
+  }
+
+  if (
+    contestantKey &&
+    (options.highlightContestantHistory !== false || typeof options.onSideClick === 'function')
+  ) {
+    row.classList.add('ml-team--interactive');
+  }
+
+  // カスタムレンダラーが指定されていれば優先使用する
+  if (typeof options.renderSide === 'function') {
+    const custom = options.renderSide(side, {
+      match,
+      contestant,
+      roundIndex: match.roundIndex,
+      order: match.order,
+      sideIndex,
+      isBronzeMatch,
+    });
+    if (custom !== null) {
+      if (typeof custom === 'string') {
+        const span = document.createElement('span');
+        span.className = 'ml-team-custom';
+        span.textContent = custom;
+        row.appendChild(span);
+      } else {
+        row.appendChild(custom);
+      }
+      return row;
+    }
+  }
+
+  // シード番号・エントリーステータス（contestant.entryStatus）
+  if (contestant?.entryStatus) {
+    const seedEl = document.createElement('span');
+    seedEl.className = 'ml-team-seed';
+    seedEl.textContent = contestant.entryStatus;
+    row.appendChild(seedEl);
+  }
+
+  // 参加者名エリア（シングルス/チーム戦は1行、ダブルスは縦並び複数行に対応）
+  const playersWrap = document.createElement('div');
+  playersWrap.className = 'ml-players';
+
+  if (side?.isBye) {
+    const byeEl = document.createElement('span');
+    byeEl.className = 'ml-team-name';
+    byeEl.textContent = side.title || byeLabel;
+    playersWrap.appendChild(byeEl);
+  } else if (contestant && contestant.players.length > 0) {
+    for (const player of contestant.players) {
+      const playerLine = document.createElement('div');
+      playerLine.className = 'ml-player';
+
+      if (player.nationality) {
+        const natEl = document.createElement('span');
+        natEl.className = 'ml-team-flag';
+        natEl.textContent = player.nationality;
+        playerLine.appendChild(natEl);
+      }
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'ml-team-name';
+      nameEl.textContent = player.title;
+      nameEl.title = player.title;
+      playerLine.appendChild(nameEl);
+
+      playersWrap.appendChild(playerLine);
+    }
+  } else {
+    const nameEl = document.createElement('span');
+    nameEl.className = 'ml-team-name';
+    const text = side?.title || tbdLabel;
+    nameEl.textContent = text;
+    nameEl.title = text;
+    playersWrap.appendChild(nameEl);
+  }
+
+  row.appendChild(playersWrap);
+
+  // サーブ権などのアクティブドット
+  if (side?.isServing) {
+    const serveEl = document.createElement('span');
+    serveEl.className = 'ml-team-serving';
+    serveEl.setAttribute('aria-label', 'サーブ中');
+    row.appendChild(serveEl);
+  }
+
+  // スコア（scores + currentScore）
+  if (side) {
+    const scoresEl = createScoresElement(side.scores, side.currentScore);
+    if (scoresEl) {
+      row.appendChild(scoresEl);
+    }
+  }
+
+  return row;
+}
+
+/**
+ * 試合カード上部のヘッダー行（会場・ラベル・開始時間・LIVEバッジ・カスタムヘッダー）を生成する
  */
 function createMatchHeader(
   match: Match,
-  roundIndex: number,
-  matchIndex: number,
-  isThirdPlace: boolean,
+  isBronzeMatch: boolean,
   options: BracketOptions,
 ): HTMLDivElement | null {
   if (typeof options.renderMatchHeader === 'function') {
     const custom = options.renderMatchHeader(match, {
-      roundIndex,
-      matchIndex,
-      isThirdPlace,
+      roundIndex: match.roundIndex,
+      order: match.order,
+      isBronzeMatch,
     });
     if (custom !== null) {
       const headerEl = document.createElement('div');
@@ -273,7 +389,7 @@ function createMatchHeader(
     }
   }
 
-  const isLive = match.status === 'live';
+  const isLive = Boolean(match.isLive);
   const showStartTime =
     options.showStartTime !== false && match.startTime !== undefined && match.startTime !== '';
   const showVenue =
@@ -381,25 +497,24 @@ function createMatchHeader(
  */
 function createMatchCard(
   match: Match,
-  roundIndex: number,
-  matchIndex: number,
-  isThirdPlace: boolean,
+  matchKey: string,
+  contestants: Record<string, Contestant> | undefined,
+  isBronzeMatch: boolean,
   options: BracketOptions,
   tbdLabel: string,
   byeLabel: string,
 ): HTMLDivElement {
   const card = document.createElement('div');
   card.className = 'ml-match';
-  card.dataset.matchId = match.id;
-  card.dataset.roundIndex = String(roundIndex);
-  card.dataset.matchIndex = String(matchIndex);
+  card.dataset.matchKey = matchKey;
+  card.dataset.roundIndex = String(match.roundIndex);
+  card.dataset.order = String(match.order);
 
-  if (isThirdPlace) {
+  if (isBronzeMatch) {
     card.classList.add('ml-match--third-place');
   }
-
-  if (match.status) {
-    card.classList.add(`ml-match--${match.status}`);
+  if (match.isLive) {
+    card.classList.add('ml-match--live');
   }
 
   if (typeof options.onMatchClick === 'function') {
@@ -408,23 +523,33 @@ function createMatchCard(
     card.setAttribute('tabindex', '0');
   }
 
-  // 試合ヘッダー（LIVEバッジ・試合ラベル等）
-  const headerEl = createMatchHeader(match, roundIndex, matchIndex, isThirdPlace, options);
+  // 試合ヘッダー（会場・ラベル・開始時間・LIVEバッジ）
+  const headerEl = createMatchHeader(match, isBronzeMatch, options);
   if (headerEl) {
     card.appendChild(headerEl);
   }
 
-  // チームスロット
+  // 参加者スロット（2行）
   const bodyEl = document.createElement('div');
   bodyEl.className = 'ml-match-body';
-  const [topTeam, bottomTeam] = match.teams;
+  const topSide = match.sides?.[0] ?? null;
+  const bottomSide = match.sides?.[1] ?? null;
+
   bodyEl.appendChild(
-    createTeamRow(topTeam, match, roundIndex, matchIndex, 0, isThirdPlace, options, tbdLabel, byeLabel),
+    createSideRow(topSide, contestants, match, 0, isBronzeMatch, options, tbdLabel, byeLabel),
   );
   bodyEl.appendChild(
-    createTeamRow(bottomTeam, match, roundIndex, matchIndex, 1, isThirdPlace, options, tbdLabel, byeLabel),
+    createSideRow(bottomSide, contestants, match, 1, isBronzeMatch, options, tbdLabel, byeLabel),
   );
   card.appendChild(bodyEl);
+
+  // matchStatus（指定がある場合のみフッターとして控えめに表示）
+  if (match.matchStatus) {
+    const statusEl = document.createElement('div');
+    statusEl.className = 'ml-match-status';
+    statusEl.textContent = match.matchStatus;
+    card.appendChild(statusEl);
+  }
 
   return card;
 }
@@ -502,6 +627,8 @@ export function renderBracketDOM(
 
   rootEl.replaceChildren();
 
+  const { normalizedRounds, bronzeMatch } = normalizeBracketMatches(data);
+
   // 背面SVGレイヤー（接続線用）
   const svgElement = document.createElementNS(SVG_NS, 'svg');
   svgElement.setAttribute('class', 'ml-connectors');
@@ -546,14 +673,16 @@ export function renderBracketDOM(
     const matchesEl = document.createElement('div');
     matchesEl.className = 'ml-matches';
 
-    round.matches.forEach((match, matchIndex) => {
+    const roundMatches = normalizedRounds[roundIndex] ?? [];
+    roundMatches.forEach((match) => {
+      const matchKey = getMatchKey(match);
       const wrapperEl = document.createElement('div');
       wrapperEl.className = 'ml-match-wrapper';
 
       const cardEl = createMatchCard(
         match,
-        roundIndex,
-        matchIndex,
+        matchKey,
+        data.contestants,
         false,
         options,
         tbdLabel,
@@ -563,27 +692,37 @@ export function renderBracketDOM(
       wrapperEl.appendChild(cardEl);
       matchesEl.appendChild(wrapperEl);
 
-      matchElements.set(match.id, cardEl);
-      matchMetaMap.set(match.id, { match, roundIndex, matchIndex, isThirdPlace: false });
+      matchElements.set(matchKey, cardEl);
+      matchMetaMap.set(matchKey, {
+        matchKey,
+        match,
+        roundIndex: match.roundIndex,
+        order: match.order,
+        isBronzeMatch: false,
+      });
     });
 
     roundEl.appendChild(matchesEl);
 
-    // 最終ラウンドの下に3位決定戦を配置する（決勝の縦中央位置を崩さないよう独立ブロック化）
+    // 最終ラウンドの下に3位決定戦（isBronzeMatch）を配置する
     const isLastRound = roundIndex === data.rounds.length - 1;
-    if (isLastRound && data.thirdPlaceMatch) {
+    if (isLastRound && bronzeMatch) {
+      const bronzeKey = getMatchKey(bronzeMatch);
       const thirdPlaceWrap = document.createElement('div');
       thirdPlaceWrap.className = 'ml-third-place';
 
       const thirdTitle = document.createElement('div');
       thirdTitle.className = 'ml-third-place-header';
-      thirdTitle.textContent = data.thirdPlaceTitle ?? '3位決定戦';
+      thirdTitle.textContent =
+        typeof bronzeMatch.isBronzeMatch === 'string' && bronzeMatch.isBronzeMatch !== 'true'
+          ? bronzeMatch.isBronzeMatch
+          : (options.bronzeMatchTitle ?? '3位決定戦');
       thirdPlaceWrap.appendChild(thirdTitle);
 
       const thirdCard = createMatchCard(
-        data.thirdPlaceMatch,
-        -1,
-        0,
+        bronzeMatch,
+        bronzeKey,
+        data.contestants,
         true,
         options,
         tbdLabel,
@@ -592,12 +731,13 @@ export function renderBracketDOM(
       thirdPlaceWrap.appendChild(thirdCard);
       roundEl.appendChild(thirdPlaceWrap);
 
-      matchElements.set(data.thirdPlaceMatch.id, thirdCard);
-      matchMetaMap.set(data.thirdPlaceMatch.id, {
-        match: data.thirdPlaceMatch,
-        roundIndex: -1,
-        matchIndex: 0,
-        isThirdPlace: true,
+      matchElements.set(bronzeKey, thirdCard);
+      matchMetaMap.set(bronzeKey, {
+        matchKey: bronzeKey,
+        match: bronzeMatch,
+        roundIndex: bronzeMatch.roundIndex,
+        order: bronzeMatch.order,
+        isBronzeMatch: true,
       });
     }
 
@@ -611,6 +751,8 @@ export function renderBracketDOM(
     svgElement,
     roundsElement,
     roundElements,
+    normalizedRounds,
+    bronzeMatch,
     matchElements,
     matchMetaMap,
   };

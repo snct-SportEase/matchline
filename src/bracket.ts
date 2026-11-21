@@ -1,6 +1,8 @@
 import { drawConnectors } from './connectors';
 import {
-  getTeamKey,
+  getContestantKey,
+  getMatchKey,
+  isBronze,
   renderBracketDOM,
   renderNavigationBar,
   type RenderResult,
@@ -15,14 +17,34 @@ import type {
 } from './types';
 
 /**
- * 試合オブジェクトへ部分更新を適用する
+ * 既存の試合と部分更新パッチが同一試合を指しているか判定する
+ */
+function isSameMatch(match: Match, patch: MatchUpdate): boolean {
+  if ('id' in patch && patch.id !== undefined && match.id !== undefined) {
+    return match.id === patch.id;
+  }
+  if (patch.isBronzeMatch && isBronze(match)) {
+    return true;
+  }
+  if (
+    typeof patch.roundIndex === 'number' &&
+    typeof patch.order === 'number' &&
+    !isBronze(match) &&
+    !patch.isBronzeMatch
+  ) {
+    return match.roundIndex === patch.roundIndex && match.order === patch.order;
+  }
+  return false;
+}
+
+/**
+ * 試合オブジェクトへ部分更新をマージする
  */
 function mergeMatchUpdate(match: Match, update: MatchUpdate): Match {
   return {
     ...match,
     ...update,
-    id: match.id,
-    teams: update.teams ?? match.teams,
+    sides: update.sides ?? match.sides,
     meta: update.meta ? { ...match.meta, ...update.meta } : match.meta,
   };
 }
@@ -30,31 +52,70 @@ function mergeMatchUpdate(match: Match, update: MatchUpdate): Match {
 /**
  * 指定されたコンテナ要素内にトーナメント表（ブラケット）を描画する
  *
- * @param container 描画先のHTML要素
- * @param data トーナメントのラウンド・試合データ
- * @param options 描画やインタラクションのオプション
- * @returns 更新・ハイライト・ナビゲーション・破棄を行うための操作インスタンス
+ * `createBracket(container, data, options)` と Bracketry 互換の
+ * `createBracket(data, container, options)` の両方の引数順をサポートする
  */
 export function createBracket(
   container: HTMLElement,
   data: BracketData,
+  options?: BracketOptions,
+): BracketInstance;
+export function createBracket(
+  data: BracketData,
+  container: HTMLElement,
+  options?: BracketOptions,
+): BracketInstance;
+export function createBracket(
+  first: HTMLElement | BracketData,
+  second: BracketData | HTMLElement,
   options: BracketOptions = {},
 ): BracketInstance {
-  if (!(container instanceof HTMLElement)) {
-    throw new TypeError('matchline: container には有効な HTMLElement を指定してください。');
+  let container: HTMLElement;
+  let initialData: BracketData;
+
+  if (first instanceof HTMLElement) {
+    container = first;
+    initialData = second as BracketData;
+  } else if (second instanceof HTMLElement) {
+    container = second;
+    initialData = first;
+  } else {
+    throw new TypeError('matchline: 描画先の HTMLElement を指定してください。');
   }
 
-  let currentData: BracketData = data;
+  let currentData: BracketData = initialData;
   let currentOptions: BracketOptions = { ...options };
   let baseRoundIndex = Math.max(0, options.initialBaseRoundIndex ?? 0);
-  let highlightedTeamKey: string | null = null;
+  let highlightedContestantKey: string | null = null;
+  let appliedCustomThemeKeys: string[] = [];
   let renderResult: RenderResult | null = null;
   let rafId: number | null = null;
   let isDestroyed = false;
 
-  // 全体ラッパー > ナビゲーションバー + 横スクロール領域 > SVG基準ルート
+  // 全体ラッパー > ナビゲーションバー + スクロールビューポート > SVG基準ルート
   const containerEl = document.createElement('div');
   containerEl.className = 'ml-container';
+
+  /**
+   * options.theme をコンテナ要素へ反映する
+   */
+  const applyTheme = (): void => {
+    for (const key of appliedCustomThemeKeys) {
+      containerEl.style.removeProperty(key);
+    }
+    appliedCustomThemeKeys = [];
+
+    const theme = currentOptions.theme ?? 'light';
+    if (typeof theme === 'string') {
+      containerEl.dataset.theme = theme;
+    } else {
+      containerEl.dataset.theme = 'custom';
+      for (const [key, value] of Object.entries(theme)) {
+        containerEl.style.setProperty(key, value);
+        appliedCustomThemeKeys.push(key);
+      }
+    }
+  };
 
   const navEl = document.createElement('nav');
   navEl.className = 'ml-nav';
@@ -86,7 +147,6 @@ export function createBracket(
     const clampedBase = Math.min(Math.max(0, baseRoundIndex), maxBaseIndex);
     baseRoundIndex = clampedBase;
 
-    // visibleRoundsCount 未指定時は横スクロール移動用として全ラウンド間を移動可能にする
     const restrictMode = typeof rawVisible === 'number' && rawVisible > 0;
     const effectiveMax = restrictMode ? maxBaseIndex : Math.max(0, totalRounds - 1);
 
@@ -100,27 +160,33 @@ export function createBracket(
   };
 
   /**
-   * 現在の highlightedTeamKey をDOM要素へ反映する
+   * 現在の highlightedContestantKey をDOM要素へ反映する
    */
   const applyHighlightToDOM = (): void => {
     if (isDestroyed || !renderResult) {
       return;
     }
 
-    rootEl.classList.toggle('ml-has-highlight', highlightedTeamKey !== null);
+    rootEl.classList.toggle('ml-has-highlight', highlightedContestantKey !== null);
 
-    const teamEls = rootEl.querySelectorAll<HTMLElement>('.ml-team');
-    for (const teamEl of teamEls) {
-      const isMatch = highlightedTeamKey !== null && teamEl.dataset.teamKey === highlightedTeamKey;
-      teamEl.classList.toggle('ml-team--highlighted', isMatch);
+    const sideEls = rootEl.querySelectorAll<HTMLElement>('.ml-team');
+    for (const sideEl of sideEls) {
+      const isMatch =
+        highlightedContestantKey !== null &&
+        sideEl.dataset.contestantKey === highlightedContestantKey;
+      sideEl.classList.toggle('ml-team--highlighted', isMatch);
     }
 
-    for (const [matchId, cardEl] of renderResult.matchElements.entries()) {
-      const meta = renderResult.matchMetaMap.get(matchId);
-      const hasTeam =
-        highlightedTeamKey !== null &&
-        Boolean(meta?.match.teams.some((team) => getTeamKey(team) === highlightedTeamKey));
-      cardEl.classList.toggle('ml-match--highlighted', hasTeam);
+    for (const [matchKey, cardEl] of renderResult.matchElements.entries()) {
+      const meta = renderResult.matchMetaMap.get(matchKey);
+      const hasContestant =
+        highlightedContestantKey !== null &&
+        Boolean(
+          (meta?.match.sides ?? []).some(
+            (side) => getContestantKey(side) === highlightedContestantKey,
+          ),
+        );
+      cardEl.classList.toggle('ml-match--highlighted', hasContestant);
     }
   };
 
@@ -134,10 +200,10 @@ export function createBracket(
     drawConnectors(
       rootEl,
       renderResult.svgElement,
-      currentData,
+      renderResult.normalizedRounds,
       renderResult.matchElements,
       currentOptions.connectorType ?? 'orthogonal',
-      highlightedTeamKey,
+      highlightedContestantKey,
     );
   };
 
@@ -191,6 +257,8 @@ export function createBracket(
       return;
     }
 
+    applyTheme();
+
     const navState = computeNavigationState();
     const showNav = currentOptions.showNavigation !== false && currentData.rounds.length > 1;
     navEl.hidden = !showNav;
@@ -207,13 +275,13 @@ export function createBracket(
   };
 
   /**
-   * チームハイライト状態を切り替える
+   * 参加者のハイライト状態を切り替える
    */
-  const setHighlight = (teamKey: string | null): void => {
-    if (isDestroyed || highlightedTeamKey === teamKey) {
+  const setHighlight = (contestantKey: string | null): void => {
+    if (isDestroyed || highlightedContestantKey === contestantKey) {
       return;
     }
-    highlightedTeamKey = teamKey;
+    highlightedContestantKey = contestantKey;
     applyHighlightToDOM();
     redrawConnectors();
   };
@@ -229,13 +297,13 @@ export function createBracket(
       return;
     }
 
-    const teamEl = target.closest<HTMLElement>('.ml-team');
+    const sideEl = target.closest<HTMLElement>('.ml-team');
     const cardEl = target.closest<HTMLElement>('.ml-match');
 
     // カード外をクリックした場合はハイライトを解除する
     if (!cardEl || !rootEl.contains(cardEl)) {
       if (
-        currentOptions.highlightTeamHistory !== false &&
+        currentOptions.highlightContestantHistory !== false &&
         (currentOptions.highlightTrigger ?? 'click') === 'click'
       ) {
         setHighlight(null);
@@ -243,45 +311,52 @@ export function createBracket(
       return;
     }
 
-    const matchId = cardEl.dataset.matchId;
-    if (!matchId) {
+    const matchKey = cardEl.dataset.matchKey;
+    if (!matchKey) {
       return;
     }
 
-    const meta = renderResult.matchMetaMap.get(matchId);
+    const meta = renderResult.matchMetaMap.get(matchKey);
     if (!meta) {
       return;
     }
 
-    const round = meta.isThirdPlace ? null : (currentData.rounds[meta.roundIndex] ?? null);
+    const round = meta.isBronzeMatch ? null : (currentData.rounds[meta.roundIndex] ?? null);
     const matchContext = {
       roundIndex: meta.roundIndex,
-      matchIndex: meta.matchIndex,
+      order: meta.order,
       round,
-      isThirdPlace: meta.isThirdPlace,
+      isBronzeMatch: meta.isBronzeMatch,
       element: cardEl,
       event,
     };
 
-    // チーム行に対するハイライトおよびコールバック処理
-    if (teamEl && cardEl.contains(teamEl)) {
-      const teamIndex = Number(teamEl.dataset.teamIndex) as 0 | 1;
-      const team = meta.match.teams[teamIndex] ?? null;
-      const teamKey = getTeamKey(team);
+    // 参加者スロットに対するハイライトおよびコールバック処理
+    if (sideEl && cardEl.contains(sideEl)) {
+      const sideIndex = Number(sideEl.dataset.sideIndex) as 0 | 1;
+      const side = meta.match.sides?.[sideIndex] ?? null;
+      const contestantKey = getContestantKey(side);
+      const contestant =
+        side?.contestantId && currentData.contestants
+          ? (currentData.contestants[side.contestantId] ?? null)
+          : null;
 
       if (
-        currentOptions.highlightTeamHistory !== false &&
+        currentOptions.highlightContestantHistory !== false &&
         (currentOptions.highlightTrigger ?? 'click') === 'click'
       ) {
-        setHighlight(teamKey && highlightedTeamKey === teamKey ? null : teamKey);
+        setHighlight(
+          contestantKey && highlightedContestantKey === contestantKey ? null : contestantKey,
+        );
       }
 
-      if (team && typeof currentOptions.onTeamClick === 'function') {
-        currentOptions.onTeamClick(team, {
+      if (side && typeof currentOptions.onSideClick === 'function') {
+        currentOptions.onSideClick(side, {
           ...matchContext,
           match: meta.match,
-          teamIndex,
-          teamKey,
+          sideIndex,
+          contestant,
+          contestantKey,
         });
       }
     }
@@ -309,7 +384,7 @@ export function createBracket(
   const handlePointerOver = (event: PointerEvent): void => {
     if (
       isDestroyed ||
-      currentOptions.highlightTeamHistory === false ||
+      currentOptions.highlightContestantHistory === false ||
       currentOptions.highlightTrigger !== 'hover'
     ) {
       return;
@@ -317,16 +392,16 @@ export function createBracket(
     if (!(event.target instanceof Element)) {
       return;
     }
-    const teamEl = event.target.closest<HTMLElement>('.ml-team');
-    if (teamEl && rootEl.contains(teamEl)) {
-      setHighlight(teamEl.dataset.teamKey ?? null);
+    const sideEl = event.target.closest<HTMLElement>('.ml-team');
+    if (sideEl && rootEl.contains(sideEl)) {
+      setHighlight(sideEl.dataset.contestantKey ?? null);
     }
   };
 
   const handlePointerLeave = (): void => {
     if (
       isDestroyed ||
-      currentOptions.highlightTeamHistory === false ||
+      currentOptions.highlightContestantHistory === false ||
       currentOptions.highlightTrigger !== 'hover'
     ) {
       return;
@@ -409,88 +484,121 @@ export function createBracket(
   // 初回描画
   render();
 
+  const updateImpl = (newData: BracketData, newOptions?: Partial<BracketOptions>): void => {
+    if (isDestroyed) {
+      return;
+    }
+    currentData = newData;
+    if (newOptions) {
+      currentOptions = { ...currentOptions, ...newOptions };
+    }
+    render();
+  };
+
+  const updateMatchesImpl = (updates: MatchUpdate[]): void => {
+    if (isDestroyed || updates.length === 0) {
+      return;
+    }
+
+    const existingMatches = [...(currentData.matches ?? [])];
+
+    for (const patch of updates) {
+      const index = existingMatches.findIndex((m) => isSameMatch(m, patch));
+      if (index >= 0) {
+        existingMatches[index] = mergeMatchUpdate(existingMatches[index], patch);
+      } else if (typeof patch.roundIndex === 'number' && typeof patch.order === 'number') {
+        existingMatches.push({
+          roundIndex: patch.roundIndex,
+          order: patch.order,
+          ...patch,
+        });
+      }
+    }
+
+    currentData = {
+      ...currentData,
+      matches: existingMatches,
+    };
+    render();
+  };
+
+  const destroyImpl = (): void => {
+    if (isDestroyed) {
+      return;
+    }
+    isDestroyed = true;
+
+    if (rafId !== null) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+
+    if (resizeObserver) {
+      resizeObserver.disconnect();
+      resizeObserver = null;
+    }
+
+    rootEl.removeEventListener('click', handleRootClick);
+    rootEl.removeEventListener('keydown', handleRootKeyDown);
+    rootEl.removeEventListener('pointerover', handlePointerOver);
+    rootEl.removeEventListener('pointerleave', handlePointerLeave);
+    navEl.removeEventListener('click', handleNavClick);
+
+    containerEl.remove();
+    renderResult = null;
+  };
+
   return {
-    update(newData: BracketData, newOptions?: Partial<BracketOptions>): void {
+    update: updateImpl,
+    replaceData(newData: BracketData): void {
+      updateImpl(newData);
+    },
+    applyNewOptions(newOptions: Partial<BracketOptions>): void {
       if (isDestroyed) {
         return;
       }
-      currentData = newData;
-      if (newOptions) {
-        currentOptions = { ...currentOptions, ...newOptions };
-      }
+      currentOptions = { ...currentOptions, ...newOptions };
       render();
     },
+    updateMatches: updateMatchesImpl,
+    applyMatchesUpdates: updateMatchesImpl,
 
-    updateMatches(updates: MatchUpdate[]): void {
-      if (isDestroyed || updates.length === 0) {
-        return;
-      }
-
-      const updateMap = new Map<string, MatchUpdate>();
-      for (const item of updates) {
-        updateMap.set(item.id, item);
-      }
-
-      const nextRounds = currentData.rounds.map((round) => ({
-        ...round,
-        matches: round.matches.map((match) => {
-          const patch = updateMap.get(match.id);
-          return patch ? mergeMatchUpdate(match, patch) : match;
-        }),
-      }));
-
-      let nextThirdPlace = currentData.thirdPlaceMatch;
-      if (nextThirdPlace) {
-        const patch = updateMap.get(nextThirdPlace.id);
-        if (patch) {
-          nextThirdPlace = mergeMatchUpdate(nextThirdPlace, patch);
-        }
-      }
-
-      currentData = {
-        ...currentData,
-        rounds: nextRounds,
-        thirdPlaceMatch: nextThirdPlace,
-      };
-      render();
+    highlightContestantHistory(contestantId: string | null): void {
+      setHighlight(contestantId);
     },
 
-    highlightTeam(teamKey: string | null): void {
-      setHighlight(teamKey);
-    },
-
-    focusTeam(teamKey: string): boolean {
-      if (isDestroyed || !teamKey) {
+    focusContestant(contestantId: string): boolean {
+      if (isDestroyed || !contestantId || !renderResult) {
         return false;
       }
 
-      // 該当チームが出場する最初のラウンドと試合要素を探す
       let targetRoundIndex = -1;
-      let targetMatchId: string | null = null;
+      let targetMatchKey: string | null = null;
 
-      for (let r = 0; r < currentData.rounds.length; r++) {
-        for (const match of currentData.rounds[r].matches) {
-          if (match.teams.some((t) => getTeamKey(t) === teamKey)) {
+      for (let r = 0; r < renderResult.normalizedRounds.length; r++) {
+        for (const match of renderResult.normalizedRounds[r]) {
+          if ((match.sides ?? []).some((s) => getContestantKey(s) === contestantId)) {
             targetRoundIndex = r;
-            targetMatchId = match.id;
+            targetMatchKey = getMatchKey(match);
             break;
           }
         }
-        if (targetMatchId) break;
+        if (targetMatchKey) break;
       }
 
-      if (!targetMatchId && currentData.thirdPlaceMatch) {
-        if (currentData.thirdPlaceMatch.teams.some((t) => getTeamKey(t) === teamKey)) {
+      if (!targetMatchKey && renderResult.bronzeMatch) {
+        if (
+          (renderResult.bronzeMatch.sides ?? []).some((s) => getContestantKey(s) === contestantId)
+        ) {
           targetRoundIndex = currentData.rounds.length - 1;
-          targetMatchId = currentData.thirdPlaceMatch.id;
+          targetMatchKey = getMatchKey(renderResult.bronzeMatch);
         }
       }
 
-      if (!targetMatchId) {
+      if (!targetMatchKey) {
         return false;
       }
 
-      // visibleRoundsCount 制限中に対象ラウンドが範囲外なら移動する
       const restrictMode =
         typeof currentOptions.visibleRoundsCount === 'number' &&
         currentOptions.visibleRoundsCount > 0;
@@ -501,9 +609,9 @@ export function createBracket(
         }
       }
 
-      setHighlight(teamKey);
+      setHighlight(contestantId);
 
-      const cardEl = renderResult?.matchElements.get(targetMatchId);
+      const cardEl = renderResult?.matchElements.get(targetMatchKey);
       if (cardEl && typeof cardEl.scrollIntoView === 'function') {
         cardEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
       }
@@ -540,30 +648,7 @@ export function createBracket(
       redrawConnectors();
     },
 
-    destroy(): void {
-      if (isDestroyed) {
-        return;
-      }
-      isDestroyed = true;
-
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-        resizeObserver = null;
-      }
-
-      rootEl.removeEventListener('click', handleRootClick);
-      rootEl.removeEventListener('keydown', handleRootKeyDown);
-      rootEl.removeEventListener('pointerover', handlePointerOver);
-      rootEl.removeEventListener('pointerleave', handlePointerLeave);
-      navEl.removeEventListener('click', handleNavClick);
-
-      containerEl.remove();
-      renderResult = null;
-    },
+    destroy: destroyImpl,
+    uninstall: destroyImpl,
   };
 }

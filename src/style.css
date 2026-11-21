@@ -80,6 +80,47 @@
   flex-direction: column;
 }
 
+/* ビルトインテーマ: ダーク */
+.ml-container[data-theme='dark'] {
+  --ml-bg: #0b1120;
+  --ml-card-bg: #1e293b;
+  --ml-card-border: #334155;
+  --ml-card-border-hover: #64748b;
+  --ml-card-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --ml-text-color: #f1f5f9;
+  --ml-text-muted: #94a3b8;
+  --ml-seed-color: #94a3b8;
+  --ml-divider-color: #334155;
+  --ml-score-color: #cbd5e1;
+  --ml-score-divider: #334155;
+  --ml-winner-color: #ffffff;
+  --ml-winner-score-color: #ffffff;
+  --ml-winner-accent: #38bdf8;
+  --ml-highlight-color: #38bdf8;
+  --ml-highlight-bg: rgba(56, 189, 248, 0.14);
+  --ml-highlight-border: #38bdf8;
+  --ml-header-color: #94a3b8;
+  --ml-header-bg: #0b1120;
+  --ml-header-border: #1e293b;
+  --ml-nav-bg: #0f172a;
+  --ml-nav-border: #1e293b;
+  --ml-nav-text: #94a3b8;
+  --ml-nav-active-bg: #1e293b;
+  --ml-nav-active-text: #f8fafc;
+  --ml-line-color: #334155;
+  --ml-line-active-color: #64748b;
+  --ml-line-highlight-color: #38bdf8;
+}
+
+/* ビルトインテーマ: エメラルド */
+.ml-container[data-theme='emerald'] {
+  --ml-winner-accent: #059669;
+  --ml-highlight-color: #059669;
+  --ml-highlight-bg: rgba(5, 150, 105, 0.09);
+  --ml-highlight-border: #059669;
+  --ml-line-highlight-color: #059669;
+}
+
 .ml-container *,
 .ml-container *::before,
 .ml-container *::after {
@@ -505,10 +546,27 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 参加者名コンテナ（シングルス/ダブルス両対応） */
+.ml-players {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 6px 5px 0;
+}
+
+.ml-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 /* 国旗 / バッジ */
 .ml-team-flag {
   flex-shrink: 0;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   line-height: 1;
 }
 
@@ -519,7 +577,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding-right: 6px;
 }
 
 /* サーブ権ドット */
@@ -568,6 +625,11 @@
   font-weight: 700;
 }
 
+.ml-team-score--current {
+  color: var(--ml-live-color);
+  font-weight: 700;
+}
+
 .ml-team-score-sub {
   font-size: 0.62rem;
   line-height: 1;
@@ -584,6 +646,16 @@
 
 .ml-team--highlighted .ml-team-score {
   color: var(--ml-highlight-color);
+}
+
+/* 試合ステータスフッター（matchStatus） */
+.ml-match-status {
+  padding: 4px 10px;
+  font-size: 0.68rem;
+  color: var(--ml-text-muted);
+  border-top: 1px solid var(--ml-divider-color);
+  background: var(--ml-nav-bg);
+  text-align: right;
 }
 
 /* ==========================================================================

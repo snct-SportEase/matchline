@@ -4,30 +4,223 @@ import {
   createBracket,
   generateBracketData,
   type BracketData,
-  type ConnectorType,
-  type HighlightTrigger,
-  type MatchTeam,
+  type Match,
   type MatchVenue,
+  type SeedContestantInput,
 } from '../src/index';
 
 /**
- * 大規模トーナメント（16 / 20 / 32 / 64チーム）のダミーデータを生成し、
- * 決勝直前まで試合進行した状態を作成する
+ * 8チーム・Bracketry互換スキーマのサンプルデータ（3位決定戦・LIVE・現在スコア含む）
+ */
+function createInitialData(): BracketData {
+  return {
+    rounds: [{ name: '準々決勝' }, { name: '準決勝' }, { name: '決勝' }],
+    contestants: {
+      t1: { entryStatus: '1', players: [{ title: '東京サンダーズ', nationality: '🇯🇵' }] },
+      t2: { entryStatus: '2', players: [{ title: '福岡ウェーブス', nationality: '🇯🇵' }] },
+      t3: { entryStatus: '3', players: [{ title: '横浜ベイサイド', nationality: '🇯🇵' }] },
+      t4: { entryStatus: '4', players: [{ title: '名古屋ブレイズ', nationality: '🇯🇵' }] },
+      t5: {
+        entryStatus: '5',
+        players: [{ title: '大阪スターズFC（長いチーム名の省略確認）', nationality: '🇯🇵' }],
+      },
+      t6: { entryStatus: '6', players: [{ title: '広島フェニックス', nationality: '🇯🇵' }] },
+      t7: { entryStatus: '7', players: [{ title: '仙台フォレスト', nationality: '🇯🇵' }] },
+      t8: { entryStatus: '8', players: [{ title: '札幌ノースウィンド', nationality: '🇯🇵' }] },
+    },
+    matches: [
+      // 準々決勝 (roundIndex: 0)
+      {
+        roundIndex: 0,
+        order: 0,
+        venue: { id: 'c1', name: '第1コート', color: '#2563eb' },
+        startTime: '10:00',
+        sides: [
+          {
+            contestantId: 't1',
+            isWinner: true,
+            scores: [
+              { mainScore: 6, isWinner: true },
+              { mainScore: 7, subscore: 5, isWinner: true },
+            ],
+          },
+          {
+            contestantId: 't8',
+            scores: [{ mainScore: 4 }, { mainScore: 6, subscore: 3 }],
+          },
+        ],
+      },
+      {
+        roundIndex: 0,
+        order: 1,
+        venue: { id: 'c2', name: '第2コート', color: '#059669' },
+        startTime: '10:00',
+        sides: [
+          {
+            contestantId: 't4',
+            scores: [{ mainScore: 6, isWinner: true }, { mainScore: 3 }, { mainScore: 4 }],
+          },
+          {
+            contestantId: 't5',
+            isWinner: true,
+            scores: [
+              { mainScore: 4 },
+              { mainScore: 6, isWinner: true },
+              { mainScore: 6, isWinner: true },
+            ],
+          },
+        ],
+      },
+      {
+        roundIndex: 0,
+        order: 2,
+        venue: { id: 'c1', name: '第1コート', color: '#2563eb' },
+        startTime: '11:30',
+        sides: [
+          {
+            contestantId: 't2',
+            isWinner: true,
+            scores: [
+              { mainScore: 6, isWinner: true },
+              { mainScore: 6, isWinner: true },
+            ],
+          },
+          {
+            contestantId: 't7',
+            scores: [{ mainScore: 2 }, { mainScore: 3 }],
+          },
+        ],
+      },
+      {
+        roundIndex: 0,
+        order: 3,
+        venue: { id: 'c2', name: '第2コート', color: '#059669' },
+        startTime: '11:30',
+        sides: [
+          {
+            contestantId: 't3',
+            isWinner: true,
+            scores: [
+              { mainScore: 7, subscore: 4, isWinner: true },
+              { mainScore: 6, isWinner: true },
+            ],
+          },
+          {
+            contestantId: 't6',
+            scores: [{ mainScore: 6, subscore: 2 }, { mainScore: 4 }],
+          },
+        ],
+      },
+      // 準決勝 (roundIndex: 1)
+      {
+        roundIndex: 1,
+        order: 0,
+        venue: { id: 'center', name: 'センターコート', color: '#ef4444' },
+        startTime: '2026-11-21T13:30:00+09:00',
+        sides: [
+          {
+            contestantId: 't1',
+            isWinner: true,
+            scores: [
+              { mainScore: 6, isWinner: true },
+              { mainScore: 6, isWinner: true },
+            ],
+          },
+          {
+            contestantId: 't5',
+            scores: [{ mainScore: 3 }, { mainScore: 4 }],
+          },
+        ],
+      },
+      {
+        roundIndex: 1,
+        order: 1,
+        venue: { id: 'center', name: 'センターコート', color: '#ef4444' },
+        startTime: '2026-11-21T15:00:00+09:00',
+        sides: [
+          {
+            contestantId: 't2',
+            scores: [{ mainScore: 4 }, { mainScore: 6, isWinner: true }, { mainScore: 5 }],
+          },
+          {
+            contestantId: 't3',
+            isWinner: true,
+            scores: [
+              { mainScore: 6, isWinner: true },
+              { mainScore: 3 },
+              { mainScore: 7, isWinner: true },
+            ],
+          },
+        ],
+      },
+      // 決勝 (roundIndex: 2)
+      {
+        roundIndex: 2,
+        order: 0,
+        venue: { id: 'center', name: 'センターコート', color: '#ef4444' },
+        label: '決勝戦',
+        startTime: new Date('2026-11-21T17:00:00+09:00'),
+        isLive: true,
+        sides: [
+          {
+            contestantId: 't1',
+            scores: [{ mainScore: 6, isWinner: true }, { mainScore: 4 }],
+            currentScore: '30',
+            isServing: true,
+          },
+          {
+            contestantId: 't3',
+            scores: [{ mainScore: 4 }, { mainScore: 4 }],
+            currentScore: '15',
+          },
+        ],
+      },
+      // 3位決定戦 (isBronzeMatch: true)
+      {
+        roundIndex: 2,
+        order: 1,
+        isBronzeMatch: true,
+        venue: { id: 'c2', name: '第2コート', color: '#059669' },
+        startTime: '16:00',
+        sides: [
+          {
+            contestantId: 't5',
+            scores: [{ mainScore: 5 }, { mainScore: 4 }],
+          },
+          {
+            contestantId: 't2',
+            isWinner: true,
+            scores: [
+              { mainScore: 7, isWinner: true },
+              { mainScore: 6, isWinner: true },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/**
+ * 大規模トーナメント（16 / 20 / 32 / 64チーム）の Bracketry 互換ダミーデータを生成する
  */
 function createLargeSampleData(teamCount: number): BracketData {
   const prefectures = [
     '東京', '大阪', '愛知', '福岡', '北海道', '神奈川', '広島', '宮城',
     '埼玉', '千葉', '兵庫', '静岡', '京都', '新潟', '長野', '熊本',
   ];
-  const suffixes = ['サンダーズ', 'ブレイズ', 'ウェーブス', 'スターズ', 'フォレスト', 'フェニックス', 'イーグルス', 'ライオンズ'];
+  const suffixes = [
+    'サンダーズ', 'ブレイズ', 'ウェーブス', 'スターズ',
+    'フォレスト', 'フェニックス', 'イーグルス', 'ライオンズ',
+  ];
 
-  const teams: MatchTeam[] = Array.from({ length: teamCount }, (_, i) => {
+  const entries: SeedContestantInput[] = Array.from({ length: teamCount }, (_, i) => {
     const pref = prefectures[i % prefectures.length];
     const suf = suffixes[Math.floor(i / prefectures.length) % suffixes.length];
     return {
       id: `team-${i + 1}`,
-      seed: i + 1,
-      name: `${pref}${suf} #${i + 1}`,
+      entryStatus: String(i + 1),
+      title: `${pref}${suf} #${i + 1}`,
     };
   });
 
@@ -38,326 +231,90 @@ function createLargeSampleData(teamCount: number): BracketData {
     { id: 'c4', name: '第4コート', color: '#7c3aed' },
   ];
 
-  const data = generateBracketData(teams, {
-    includeThirdPlace: true,
-    thirdPlaceTitle: '3位決定戦',
+  const data = generateBracketData(entries, {
+    includeBronzeMatch: true,
     venues,
   });
 
-  // 準決勝まで勝敗を自動進行させ、決勝を LIVE 状態にする
+  const matches = data.matches ?? [];
   const totalRounds = data.rounds.length;
+  const bronzeMatch = matches.find((m) => Boolean(m.isBronzeMatch));
+
+  const findMatch = (r: number, o: number): Match | undefined =>
+    matches.find((m) => !m.isBronzeMatch && m.roundIndex === r && m.order === o);
+
   for (let r = 0; r < totalRounds; r++) {
-    const round = data.rounds[r];
     const isFinal = r === totalRounds - 1;
     const baseHour = 9 + r * 2;
+    const roundMatches = matches.filter((m) => !m.isBronzeMatch && m.roundIndex === r);
 
-    round.matches.forEach((match, mIdx) => {
-      const minutes = (mIdx % 4) * 15;
+    for (const match of roundMatches) {
+      const minutes = (match.order % 4) * 15;
       match.startTime = `${String(baseHour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 
-      if (match.status === 'bye') {
-        return;
+      if (match.matchStatus === '不戦勝') {
+        continue;
       }
 
-      const [tA, tB] = match.teams;
-      if (!tA || !tB) {
-        return;
+      const sideA = match.sides?.[0];
+      const sideB = match.sides?.[1];
+      if (!sideA?.contestantId || !sideB?.contestantId) {
+        continue;
       }
 
       if (isFinal) {
         match.venue = { id: 'center', name: 'センターコート', color: '#ef4444' };
-        match.status = 'live';
-        tA.score = [{ main: 6, isWinner: true }, 4];
-        tA.isServing = true;
-        tB.score = [4, 4];
-        return;
+        match.isLive = true;
+        sideA.scores = [{ mainScore: 6, isWinner: true }, { mainScore: 4 }];
+        sideA.currentScore = '30';
+        sideA.isServing = true;
+        sideB.scores = [{ mainScore: 4 }, { mainScore: 4 }];
+        sideB.currentScore = '15';
+        continue;
       }
 
-      // シード上位を少し勝ちやすくしつつ適度にアップセットを混ぜる
-      const aWins = (r + mIdx) % 5 !== 2;
-      match.status = 'completed';
-      tA.isWinner = aWins;
-      tB.isWinner = !aWins;
-      tA.score = aWins ? [6, 6] : [4, 3];
-      tB.score = aWins ? [4, 3] : [6, 6];
+      const aWins = (r + match.order) % 5 !== 2;
+      sideA.isWinner = aWins;
+      sideB.isWinner = !aWins;
+      sideA.scores = aWins
+        ? [{ mainScore: 6, isWinner: true }, { mainScore: 6, isWinner: true }]
+        : [{ mainScore: 4 }, { mainScore: 3 }];
+      sideB.scores = aWins
+        ? [{ mainScore: 4 }, { mainScore: 3 }]
+        : [{ mainScore: 6, isWinner: true }, { mainScore: 6, isWinner: true }];
 
-      const winner = aWins ? tA : tB;
-      const nextRound = data.rounds[r + 1];
-      if (nextRound) {
-        const nextMatch = nextRound.matches[Math.floor(mIdx / 2)];
-        nextMatch.teams[mIdx % 2] = {
-          id: winner.id,
-          seed: winner.seed,
-          name: winner.name,
-        };
+      const winnerId = aWins ? sideA.contestantId : sideB.contestantId;
+      const nextMatch = findMatch(r + 1, Math.floor(match.order / 2));
+      if (nextMatch) {
+        const nextSides = nextMatch.sides ?? [];
+        nextSides[match.order % 2] = { contestantId: winnerId };
+        nextMatch.sides = nextSides;
       }
 
       // 準決勝の敗者を3位決定戦へ配置
-      if (r === totalRounds - 2 && data.thirdPlaceMatch) {
-        const loser = aWins ? tB : tA;
-        data.thirdPlaceMatch.teams[mIdx] = {
-          id: loser.id,
-          seed: loser.seed,
-          name: loser.name,
-          score: mIdx === 0 ? [6, 6] : [4, 5],
-          isWinner: mIdx === 0,
+      if (r === totalRounds - 2 && bronzeMatch) {
+        const loserId = aWins ? sideB.contestantId : sideA.contestantId;
+        const bronzeSides = bronzeMatch.sides ?? [];
+        bronzeSides[match.order] = {
+          contestantId: loserId,
+          isWinner: match.order === 0,
+          scores:
+            match.order === 0
+              ? [{ mainScore: 6, isWinner: true }, { mainScore: 6, isWinner: true }]
+              : [{ mainScore: 4 }, { mainScore: 5 }],
         };
-        data.thirdPlaceMatch.status = 'completed';
-        data.thirdPlaceMatch.startTime = `${String(baseHour + 1).padStart(2, '0')}:30`;
+        bronzeMatch.sides = bronzeSides;
+        bronzeMatch.startTime = `${String(baseHour + 1).padStart(2, '0')}:30`;
       }
-    });
+    }
   }
 
   return data;
 }
 
-/**
- * 8チーム・シングルエリミネーション + 3位決定戦のサンプルデータ
- * （複数セットスコア・タイブレーク・LIVE試合・サーブ権表示を含む）
- */
-function createInitialData(): BracketData {
-  return {
-    rounds: [
-      {
-        id: 'qf',
-        name: '準々決勝',
-        matches: [
-          {
-            id: 'm1',
-            venue: '第1コート',
-            startTime: '10:00',
-            status: 'completed',
-            teams: [
-              {
-                id: 't1',
-                seed: 1,
-                flag: '🇯🇵',
-                name: '東京サンダーズ',
-                score: [
-                  { main: 6, isWinner: true },
-                  { main: 7, sub: 5, isWinner: true },
-                ],
-                isWinner: true,
-              },
-              {
-                id: 't8',
-                seed: 8,
-                flag: '🇯🇵',
-                name: '札幌ノースウィンド',
-                score: [4, { main: 6, sub: 3 }],
-              },
-            ],
-          },
-          {
-            id: 'm2',
-            venue: '第2コート',
-            startTime: '10:00',
-            status: 'completed',
-            teams: [
-              {
-                id: 't4',
-                seed: 4,
-                flag: '🇯🇵',
-                name: '名古屋ブレイズ',
-                score: [{ main: 6, isWinner: true }, 3, 4],
-              },
-              {
-                id: 't5',
-                seed: 5,
-                flag: '🇯🇵',
-                name: '大阪スターズFC（長いチーム名の省略確認）',
-                score: [
-                  4,
-                  { main: 6, isWinner: true },
-                  { main: 6, isWinner: true },
-                ],
-                isWinner: true,
-              },
-            ],
-          },
-          {
-            id: 'm3',
-            venue: '第1コート',
-            startTime: '11:30',
-            status: 'completed',
-            teams: [
-              {
-                id: 't2',
-                seed: 2,
-                flag: '🇯🇵',
-                name: '福岡ウェーブス',
-                score: [
-                  { main: 6, isWinner: true },
-                  { main: 6, isWinner: true },
-                ],
-                isWinner: true,
-              },
-              {
-                id: 't7',
-                seed: 7,
-                flag: '🇯🇵',
-                name: '仙台フォレスト',
-                score: [2, 3],
-              },
-            ],
-          },
-          {
-            id: 'm4',
-            venue: '第2コート',
-            startTime: '11:30',
-            status: 'completed',
-            teams: [
-              {
-                id: 't3',
-                seed: 3,
-                flag: '🇯🇵',
-                name: '横浜ベイサイド',
-                score: [
-                  { main: 7, sub: 4, isWinner: true },
-                  { main: 6, isWinner: true },
-                ],
-                isWinner: true,
-              },
-              {
-                id: 't6',
-                seed: 6,
-                flag: '🇯🇵',
-                name: '広島フェニックス',
-                score: [{ main: 6, sub: 2 }, 4],
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'sf',
-        name: '準決勝',
-        matches: [
-          {
-            id: 'm5',
-            venue: 'センターコート',
-            startTime: '2026-11-21T13:30:00+09:00',
-            status: 'completed',
-            teams: [
-              {
-                id: 't1',
-                seed: 1,
-                flag: '🇯🇵',
-                name: '東京サンダーズ',
-                score: [
-                  { main: 6, isWinner: true },
-                  { main: 6, isWinner: true },
-                ],
-                isWinner: true,
-              },
-              {
-                id: 't5',
-                seed: 5,
-                flag: '🇯🇵',
-                name: '大阪スターズFC（長いチーム名の省略確認）',
-                score: [3, 4],
-              },
-            ],
-          },
-          {
-            id: 'm6',
-            venue: 'センターコート',
-            startTime: '2026-11-21T15:00:00+09:00',
-            status: 'completed',
-            teams: [
-              {
-                id: 't2',
-                seed: 2,
-                flag: '🇯🇵',
-                name: '福岡ウェーブス',
-                score: [4, { main: 6, isWinner: true }, 5],
-              },
-              {
-                id: 't3',
-                seed: 3,
-                flag: '🇯🇵',
-                name: '横浜ベイサイド',
-                score: [
-                  { main: 6, isWinner: true },
-                  3,
-                  { main: 7, isWinner: true },
-                ],
-                isWinner: true,
-              },
-            ],
-          },
-        ],
-      },
-      {
-        id: 'final',
-        name: '決勝',
-        matches: [
-          {
-            id: 'm7',
-            venue: 'センターコート',
-            label: '決勝戦',
-            startTime: new Date('2026-11-21T17:00:00+09:00'),
-            status: 'live',
-            teams: [
-              {
-                id: 't1',
-                seed: 1,
-                flag: '🇯🇵',
-                name: '東京サンダーズ',
-                score: [{ main: 6, isWinner: true }, 4],
-                isServing: true,
-              },
-              {
-                id: 't3',
-                seed: 3,
-                flag: '🇯🇵',
-                name: '横浜ベイサイド',
-                score: [4, 4],
-              },
-            ],
-          },
-        ],
-      },
-    ],
-    thirdPlaceTitle: '3位決定戦',
-    thirdPlaceMatch: {
-      id: 'm-3rd',
-      venue: '第2コート',
-      startTime: '16:00',
-      status: 'completed',
-      teams: [
-        {
-          id: 't5',
-          seed: 5,
-          flag: '🇯🇵',
-          name: '大阪スターズFC（長いチーム名の省略確認）',
-          score: [5, 4],
-        },
-        {
-          id: 't2',
-          seed: 2,
-          flag: '🇯🇵',
-          name: '福岡ウェーブス',
-          score: [
-            { main: 7, isWinner: true },
-            { main: 6, isWinner: true },
-          ],
-          isWinner: true,
-        },
-      ],
-    },
-  };
-}
-
 const container = document.getElementById('bracket-root');
-const stageEl = document.getElementById('bracket-stage');
 const clickLogEl = document.getElementById('click-log');
 const sizeSelect = document.getElementById('size-select') as HTMLSelectElement | null;
-const themeSelect = document.getElementById('theme-select') as HTMLSelectElement | null;
-const connectorSelect = document.getElementById('connector-select') as HTMLSelectElement | null;
-const highlightTriggerSelect = document.getElementById(
-  'highlight-trigger-select',
-) as HTMLSelectElement | null;
 const visibleRoundsSelect = document.getElementById(
   'visible-rounds-select',
 ) as HTMLSelectElement | null;
@@ -375,31 +332,46 @@ if (!container) {
 
 let currentData: BracketData = createInitialData();
 let liveStep = 0;
-let selectedMatchId = 'm7';
+let selectedTarget: { roundIndex: number; order: number; isBronzeMatch?: boolean } = {
+  roundIndex: currentData.rounds.length - 1,
+  order: 0,
+};
 
-/**
- * 現在のブラケットデータから決勝戦のマッチIDを取得する
- */
-function getFinalMatchId(bracketData: BracketData): string {
-  const lastRound = bracketData.rounds[bracketData.rounds.length - 1];
-  return lastRound?.matches[0]?.id ?? 'm7';
-}
+const getContestantTitle = (contestantId: string | undefined): string => {
+  if (!contestantId) return 'TBD';
+  const contestant = currentData.contestants?.[contestantId];
+  if (!contestant || contestant.players.length === 0) return contestantId;
+  return contestant.players.map((p) => p.title).join(' / ');
+};
 
-const bracket = createBracket(container, currentData, {
-  connectorType: 'orthogonal',
-  highlightTeamHistory: true,
-  highlightTrigger: 'click',
+// テーマ・接続線・パス強調はコード側オプションで事前指定する
+const bracket = createBracket(currentData, container, {
+  theme: 'light', // 'light' | 'dark' | 'emerald' または CSS変数マップ
+  connectorType: 'orthogonal', // 'orthogonal' | 'curved'
+  highlightContestantHistory: true,
+  highlightTrigger: 'click', // 'click' | 'hover'
   showNavigation: true,
-  onTeamClick: (team, ctx) => {
+  onSideClick: (side, ctx) => {
     if (!clickLogEl) return;
-    const stageName = ctx.isThirdPlace ? '3位決定戦' : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
-    clickLogEl.textContent = `チーム選択: ${team.name ?? 'TBD'} (${stageName} / 試合ID: ${ctx.match.id})`;
+    const stageName = ctx.isBronzeMatch
+      ? '3位決定戦'
+      : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
+    const name = getContestantTitle(side.contestantId ?? side.title);
+    clickLogEl.textContent = `参加者選択: ${name} (${stageName} / order: ${ctx.order})`;
   },
   onMatchClick: (match, ctx) => {
-    const stageName = ctx.isThirdPlace ? '3位決定戦' : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
-    selectedMatchId = match.id;
+    const stageName = ctx.isBronzeMatch
+      ? '3位決定戦'
+      : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
+
+    selectedTarget = {
+      roundIndex: match.roundIndex,
+      order: match.order,
+      isBronzeMatch: ctx.isBronzeMatch,
+    };
+
     if (selectedMatchLabelEl) {
-      selectedMatchLabelEl.textContent = `対象: ${stageName} (${match.id})`;
+      selectedMatchLabelEl.textContent = `対象: ${stageName} (r${match.roundIndex}-o${match.order})`;
     }
     if (venueInput) {
       venueInput.value =
@@ -413,9 +385,9 @@ const bracket = createBracket(container, currentData, {
     }
 
     if (!clickLogEl) return;
-    const teamA = match.teams[0]?.name ?? 'TBD';
-    const teamB = match.teams[1]?.name ?? 'TBD';
-    clickLogEl.textContent = `[${stageName}] 試合ID: ${match.id} (${match.status ?? '-'}) | ${teamA} vs ${teamB}`;
+    const teamA = getContestantTitle(match.sides?.[0]?.contestantId ?? match.sides?.[0]?.title);
+    const teamB = getContestantTitle(match.sides?.[1]?.contestantId ?? match.sides?.[1]?.title);
+    clickLogEl.textContent = `[${stageName}] ${teamA} vs ${teamB}`;
   },
 });
 
@@ -423,57 +395,64 @@ const bracket = createBracket(container, currentData, {
 sizeSelect?.addEventListener('change', () => {
   const size = Number(sizeSelect.value);
   currentData = size === 8 ? createInitialData() : createLargeSampleData(size);
-  selectedMatchId = getFinalMatchId(currentData);
+  selectedTarget = { roundIndex: currentData.rounds.length - 1, order: 0 };
   liveStep = 0;
 
   if (selectedMatchLabelEl) {
-    selectedMatchLabelEl.textContent = `対象: 決勝 (${selectedMatchId})`;
+    selectedMatchLabelEl.textContent = `対象: 決勝 (r${selectedTarget.roundIndex}-o0)`;
   }
 
-  bracket.highlightTeam(null);
+  bracket.highlightContestantHistory(null);
   bracket.setBaseRoundIndex(0);
-  bracket.update(currentData);
+  bracket.replaceData(currentData);
 });
 
 // 選択中の試合のコート名・開始時間を動的に反映する
 applyScheduleBtn?.addEventListener('click', () => {
   const nextVenue = venueInput?.value.trim() ?? '';
   const nextTime = timeInput?.value.trim() ?? '';
-  bracket.updateMatches([
-    {
-      id: selectedMatchId,
-      venue: nextVenue || undefined,
-      startTime: nextTime || undefined,
-    },
-  ]);
+
+  if (selectedTarget.isBronzeMatch) {
+    bracket.applyMatchesUpdates([
+      {
+        isBronzeMatch: true,
+        venue: nextVenue || undefined,
+        startTime: nextTime || undefined,
+      },
+    ]);
+  } else {
+    bracket.applyMatchesUpdates([
+      {
+        roundIndex: selectedTarget.roundIndex,
+        order: selectedTarget.order,
+        venue: nextVenue || undefined,
+        startTime: nextTime || undefined,
+      },
+    ]);
+  }
 });
 
-// チーム名部分一致で検索してフォーカス＆ハイライトする
+// 参加者名部分一致で検索してフォーカス＆ハイライトする
 const runTeamSearch = (): void => {
   const query = teamSearchInput?.value.trim();
   if (!query) {
-    bracket.highlightTeam(null);
+    bracket.highlightContestantHistory(null);
     return;
   }
 
-  let matchedKey: string | null = null;
-  for (const round of currentData.rounds) {
-    for (const match of round.matches) {
-      for (const team of match.teams) {
-        if (team?.name && team.name.includes(query)) {
-          matchedKey = team.id ?? team.name;
-          break;
-        }
-      }
-      if (matchedKey) break;
+  let matchedId: string | null = null;
+  const contestants = currentData.contestants ?? {};
+  for (const [id, contestant] of Object.entries(contestants)) {
+    if (contestant.players.some((p) => p.title.includes(query))) {
+      matchedId = id;
+      break;
     }
-    if (matchedKey) break;
   }
 
-  if (matchedKey) {
-    bracket.focusTeam(matchedKey);
+  if (matchedId) {
+    bracket.focusContestant(matchedId);
     if (clickLogEl) {
-      clickLogEl.textContent = `チーム検索ヒット: "${query}" → フォーカスしました`;
+      clickLogEl.textContent = `チーム検索ヒット: "${getContestantTitle(matchedId)}" → フォーカスしました`;
     }
   } else if (clickLogEl) {
     clickLogEl.textContent = `チーム検索: "${query}" に一致するチームが見つかりません`;
@@ -487,81 +466,101 @@ teamSearchInput?.addEventListener('keydown', (e) => {
   }
 });
 
-themeSelect?.addEventListener('change', () => {
-  if (!stageEl) return;
-  stageEl.dataset.theme = themeSelect.value;
-});
-
-connectorSelect?.addEventListener('change', () => {
-  bracket.update(currentData, {
-    connectorType: connectorSelect.value as ConnectorType,
-  });
-});
-
-highlightTriggerSelect?.addEventListener('change', () => {
-  bracket.highlightTeam(null);
-  bracket.update(currentData, {
-    highlightTrigger: highlightTriggerSelect.value as HighlightTrigger,
-  });
-});
-
 visibleRoundsSelect?.addEventListener('change', () => {
   const val = visibleRoundsSelect.value;
-  bracket.update(currentData, {
+  bracket.applyNewOptions({
     visibleRoundsCount: val === 'all' ? undefined : Number(val),
   });
 });
 
-// 特定試合のみを部分更新する updateMatches のデモ
+// 特定試合のみを部分更新する applyMatchesUpdates のデモ
 liveUpdateBtn?.addEventListener('click', () => {
-  const finalId = getFinalMatchId(currentData);
-  const lastRound = currentData.rounds[currentData.rounds.length - 1];
-  const finalMatch = lastRound?.matches[0];
+  const finalRoundIndex = currentData.rounds.length - 1;
+  const finalMatch = (currentData.matches ?? []).find(
+    (m) => !m.isBronzeMatch && m.roundIndex === finalRoundIndex && m.order === 0,
+  );
   if (!finalMatch) return;
 
-  const [teamA, teamB] = finalMatch.teams;
-  if (!teamA || !teamB) return;
+  const sideA = finalMatch.sides?.[0];
+  const sideB = finalMatch.sides?.[1];
+  if (!sideA || !sideB) return;
 
   liveStep = (liveStep + 1) % 3;
 
   if (liveStep === 1) {
-    bracket.updateMatches([
+    bracket.applyMatchesUpdates([
       {
-        id: finalId,
-        status: 'live',
-        teams: [
-          { ...teamA, score: [{ main: 6, isWinner: true }, 5], isWinner: false, isServing: false },
-          { ...teamB, score: [4, 4], isWinner: false, isServing: true },
+        roundIndex: finalRoundIndex,
+        order: 0,
+        isLive: true,
+        sides: [
+          {
+            ...sideA,
+            scores: [{ mainScore: 6, isWinner: true }, { mainScore: 5 }],
+            currentScore: '15',
+            isWinner: false,
+            isServing: false,
+          },
+          {
+            ...sideB,
+            scores: [{ mainScore: 4 }, { mainScore: 4 }],
+            currentScore: '40',
+            isWinner: false,
+            isServing: true,
+          },
         ],
       },
     ]);
   } else if (liveStep === 2) {
-    bracket.updateMatches([
+    bracket.applyMatchesUpdates([
       {
-        id: finalId,
-        status: 'completed',
-        teams: [
+        roundIndex: finalRoundIndex,
+        order: 0,
+        isLive: false,
+        matchStatus: '試合終了',
+        sides: [
           {
-            ...teamA,
-            score: [
-              { main: 6, isWinner: true },
-              { main: 6, isWinner: true },
+            ...sideA,
+            scores: [
+              { mainScore: 6, isWinner: true },
+              { mainScore: 6, isWinner: true },
             ],
+            currentScore: undefined,
             isWinner: true,
             isServing: false,
           },
-          { ...teamB, score: [4, 4], isWinner: false, isServing: false },
+          {
+            ...sideB,
+            scores: [{ mainScore: 4 }, { mainScore: 4 }],
+            currentScore: undefined,
+            isWinner: false,
+            isServing: false,
+          },
         ],
       },
     ]);
   } else {
-    bracket.updateMatches([
+    bracket.applyMatchesUpdates([
       {
-        id: finalId,
-        status: 'live',
-        teams: [
-          { ...teamA, score: [{ main: 6, isWinner: true }, 4], isWinner: false, isServing: true },
-          { ...teamB, score: [4, 4], isWinner: false, isServing: false },
+        roundIndex: finalRoundIndex,
+        order: 0,
+        isLive: true,
+        matchStatus: undefined,
+        sides: [
+          {
+            ...sideA,
+            scores: [{ mainScore: 6, isWinner: true }, { mainScore: 4 }],
+            currentScore: '30',
+            isWinner: false,
+            isServing: true,
+          },
+          {
+            ...sideB,
+            scores: [{ mainScore: 4 }, { mainScore: 4 }],
+            currentScore: '15',
+            isWinner: false,
+            isServing: false,
+          },
         ],
       },
     ]);

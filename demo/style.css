@@ -124,22 +124,3 @@ body {
 .demo-search button:hover {
   background: #f1f5f9;
 }
-
-.demo-log {
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 14px 16px;
-}
-
-.demo-log h2 {
-  margin: 0 0 6px;
-  font-size: 0.82rem;
-  color: #475569;
-}
-
-.demo-log p {
-  margin: 0;
-  font-size: 0.85rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}

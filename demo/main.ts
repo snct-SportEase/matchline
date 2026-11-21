@@ -313,7 +313,6 @@ function createLargeSampleData(teamCount: number): BracketData {
 }
 
 const container = document.getElementById('bracket-root');
-const clickLogEl = document.getElementById('click-log');
 const sizeSelect = document.getElementById('size-select') as HTMLSelectElement | null;
 const visibleRoundsSelect = document.getElementById(
   'visible-rounds-select',
@@ -332,13 +331,6 @@ if (!container) {
 let currentData: BracketData = createInitialData();
 let liveStep = 0;
 
-const getContestantTitle = (contestantId: string | undefined): string => {
-  if (!contestantId) return 'TBD';
-  const contestant = currentData.contestants?.[contestantId];
-  if (!contestant || contestant.players.length === 0) return contestantId;
-  return contestant.players.map((p) => p.title).join(' / ');
-};
-
 // テーマ・接続線・パス強調・通し試合番号はコード側オプションで事前指定する
 const bracket = createBracket(currentData, container, {
   theme: 'light', // 'light' | 'dark' | 'emerald' または CSS変数マップ
@@ -347,23 +339,6 @@ const bracket = createBracket(currentData, container, {
   highlightTrigger: 'click', // 'click' | 'hover'
   autoMatchNumbers: true, // 通し試合番号（#1〜）と未定枠の「#Xの勝者」表示を有効化
   showNavigation: true,
-  onSideClick: (side, ctx) => {
-    if (!clickLogEl) return;
-    const stageName = ctx.isBronzeMatch
-      ? '3位決定戦'
-      : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
-    const name = getContestantTitle(side.contestantId ?? side.title);
-    clickLogEl.textContent = `参加者選択: ${name} (${stageName} / order: ${ctx.order})`;
-  },
-  onMatchClick: (match, ctx) => {
-    if (!clickLogEl) return;
-    const stageName = ctx.isBronzeMatch
-      ? '3位決定戦'
-      : (ctx.round?.name ?? `Round ${ctx.roundIndex + 1}`);
-    const teamA = getContestantTitle(match.sides?.[0]?.contestantId ?? match.sides?.[0]?.title);
-    const teamB = getContestantTitle(match.sides?.[1]?.contestantId ?? match.sides?.[1]?.title);
-    clickLogEl.textContent = `[${stageName}] ${teamA} vs ${teamB}`;
-  },
 });
 
 // 規模（8 / 16 / 20 / 32 / 64チーム）の切り替え
@@ -411,11 +386,6 @@ const runTeamSearch = (): void => {
 
   if (matchedId) {
     bracket.focusContestant(matchedId);
-    if (clickLogEl) {
-      clickLogEl.textContent = `チーム検索ヒット: "${getContestantTitle(matchedId)}" → フォーカスしました`;
-    }
-  } else if (clickLogEl) {
-    clickLogEl.textContent = `チーム検索: "${query}" に一致するチームが見つかりません`;
   }
 };
 

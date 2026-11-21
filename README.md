@@ -1,4 +1,4 @@
-# matchline
+# @snct-sportease/matchline
 
 依存ゼロ・Vanilla TypeScript製のトーナメント表（ブラケット）描画ライブラリです。
 [bracketry](https://bracketry.app/) のデータ構造（`rounds` / `matches` / `contestants` / `sides` / `scores`）と高い互換性を持ち、既存の `bracketry` からの移行もスムーズに行えます。
@@ -21,14 +21,14 @@
 ## インストール
 
 ```bash
-npm install matchline
+npm install @snct-sportease/matchline
 ```
 
 ## 基本的な使い方（Bracketry 互換形式）
 
 ```ts
-import { createBracket, type BracketData } from 'matchline';
-import 'matchline/style.css';
+import { createBracket, type BracketData } from '@snct-sportease/matchline';
+import '@snct-sportease/matchline/style.css';
 
 const data: BracketData = {
   rounds: [{ name: '準決勝' }, { name: '決勝' }],
@@ -131,7 +131,7 @@ bracket.uninstall(); // または bracket.destroy()
 ### 勝敗確定＆自動進出（`recordMatchResult`）
 
 ```ts
-import { recordMatchResult } from 'matchline';
+import { recordMatchResult } from '@snct-sportease/matchline';
 
 // 試合結果を確定し、勝者を次ラウンド（準決勝の敗者は3位決定戦）へ自動進出させる
 const nextData = recordMatchResult(data, {
@@ -157,7 +157,7 @@ bracket.replaceData(nextData);
 ## 大規模トーナメントの自動生成（`generateBracketData`）
 
 ```ts
-import { createBracket, generateBracketData } from 'matchline';
+import { createBracket, generateBracketData } from '@snct-sportease/matchline';
 
 const entries = Array.from({ length: 32 }, (_, i) => ({
   id: `team-${i + 1}`,
